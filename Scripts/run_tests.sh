@@ -47,6 +47,13 @@ check Scripts/validate_entity_lifecycle.py
 check Docs/PERF_BUDGET.md
 check Scripts/perf_baseline.sh
 check Scripts/validate_perf_budget.py
+check Source/Afterfall/World/ResourceNode.h
+check Source/Afterfall/World/ResourceNode.cpp
+check Source/Afterfall/AI/ZombiePrototype.h
+check Source/Afterfall/AI/ZombiePrototype.cpp
+check Source/Afterfall/Tests/FirstPlayableTest.cpp
+check Scripts/validate_first_playable.py
+check Docs/TESTNEIGHBORHOOD-SPEC.md
 check Content/Data/Loot/DA_Location_RES.json
 check Content/Data/Loot/DA_Location_GAR.json
 check Content/Data/Loot/DA_Location_HW.json
@@ -66,6 +73,7 @@ if python3 Scripts/validate_persistence.py; then echo "[PASS] persistence"; else
 if python3 Scripts/validate_inventory_crafting.py; then echo "[PASS] inventory/craft"; else echo "[FAIL] inventory/craft"; FAIL=1; fi
 if python3 Scripts/validate_entity_lifecycle.py; then echo "[PASS] entity lifecycle"; else echo "[FAIL] entity lifecycle"; FAIL=1; fi
 if python3 Scripts/validate_perf_budget.py; then echo "[PASS] perf budget math"; else echo "[FAIL] perf budget math"; FAIL=1; fi
+if python3 Scripts/validate_first_playable.py; then echo "[PASS] first playable"; else echo "[FAIL] first playable"; FAIL=1; fi
 
 # No client-authoritative placement: grep guard
 if grep -rn "ServerRequestPlacement\|ServerApplyDamage\|HasAuthority" Source/ >/dev/null; then
