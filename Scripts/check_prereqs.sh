@@ -15,12 +15,20 @@ else
   PASS=0
 fi
 
-# 2. MSVC C++ workload (VS Community present but no VC/Tools/MSVC seen)
-if ls "/c/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/" >/dev/null 2>&1; then
-  echo "[OK] MSVC toolchain found"
+# 2. MSVC C++ workload (two instances on this machine: Community IDE + C:/Program Files/VS toolchain).
+# Prefer vswhere (any instance with VC.Tools), fall back to known paths.
+MSVC_OK=0
+if "/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath >/dev/null 2>&1; then
+  MSVC_OK=1
+fi
+for d in "/c/Program Files/VS/VC/Tools/MSVC" "/c/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC"; do
+  if ls "$d" >/dev/null 2>&1; then MSVC_OK=1; fi
+done
+if [ "$MSVC_OK" -eq 1 ]; then
+  echo "[OK] MSVC toolchain found ($(ls /c/Program\ Files/VS/VC/Tools/MSVC/ 2>/dev/null | tr '\n' ' '))"
 else
   echo "[MISSING] VS C++ workload not installed."
-  echo "  Fix: Visual Studio Installer > Modify Community > check 'Desktop development with C++' + 'Windows 11 SDK'."
+  echo "  Fix: Visual Studio Installer > Modify > check 'Desktop development with C++' + 'Windows 11 SDK'."
   PASS=0
 fi
 
