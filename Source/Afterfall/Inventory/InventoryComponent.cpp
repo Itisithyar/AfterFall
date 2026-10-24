@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-#include "Inventory/InventoryComponent.h"
+#include "InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Afterfall.h"
 

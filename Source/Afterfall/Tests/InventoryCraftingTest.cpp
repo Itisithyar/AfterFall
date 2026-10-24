@@ -7,7 +7,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryWeightTest, "Afterfall.Inventory.Weight",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FInventoryWeightTest::RunTest(const FString& P)
 {
 	TestEqual(TEXT("wood 0.5kg"), UInventoryComponent::WeightForItem(TEXT("res_wood_log")), 0.5f);
@@ -17,7 +17,7 @@ bool FInventoryWeightTest::RunTest(const FString& P)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCraftingInputsTest, "Afterfall.Crafting.Inputs",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FCraftingInputsTest::RunTest(const FString& P)
 {
 	const FCraftRecipe* Wall = UCraftingService::FindRecipe(TEXT("wall"));

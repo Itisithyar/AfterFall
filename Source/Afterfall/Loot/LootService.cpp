@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-#include "Loot/LootService.h"
+#include "LootService.h"
 #include "Afterfall.h"
 
 FString ULootService::MakeRollKey(int32 RegionSeed, int32 TableVersion, const FGuid& ContainerGuid)

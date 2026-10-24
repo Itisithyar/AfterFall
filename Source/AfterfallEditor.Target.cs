@@ -7,8 +7,9 @@ public class AfterfallEditorTarget : TargetRules
 	public AfterfallEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V5;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
+		// Match installed UE 5.8 engine build env exactly (shared products with UnrealEditor).
+		DefaultBuildSettings = BuildSettingsVersion.V7;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 		ExtraModuleNames.Add("Afterfall");
 	}
 }

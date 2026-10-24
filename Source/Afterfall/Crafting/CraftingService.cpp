@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-#include "Crafting/CraftingService.h"
+#include "CraftingService.h"
 
 const TArray<FCraftRecipe>& UCraftingService::GetSliceRecipes()
 {

@@ -10,7 +10,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FConstructionValidatorGridTest,
 	"Afterfall.Construction.GridSnap",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 
 bool FConstructionValidatorGridTest::RunTest(const FString& Parameters)
 {
@@ -24,7 +24,7 @@ bool FConstructionValidatorGridTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FConstructionValidatorPlacementTest,
 	"Afterfall.Construction.ValidatePlacement",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 
 bool FConstructionValidatorPlacementTest::RunTest(const FString& Parameters)
 {

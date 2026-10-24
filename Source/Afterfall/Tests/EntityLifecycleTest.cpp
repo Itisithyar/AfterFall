@@ -5,7 +5,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEntityPromoteTest, "Afterfall.Entity.Promote",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FEntityPromoteTest::RunTest(const FString& P)
 {
 	TestTrue(TEXT("hit promotes"), UEntityLifecycleService::ShouldPromote(true, false, false, false));

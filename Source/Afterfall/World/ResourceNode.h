@@ -36,10 +36,15 @@ public:
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Node")
 	int64 DepletedUntilUnix = 0;
 
-	// Server-only harvest. Validates range (<3m), alive, not depleted, tool bonus.
-	// Returns granted amount (0 = rejected). Caller grants via Inventory::ServerAddItem.
+	// Last granted yield (0 = rejected). Set server-side by ServerHarvest.
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Gather")
+	int32 LastHarvestYield = 0;
+
+	// Server-only harvest. Validates range (<3m), not depleted, tool bonus.
+	// Result in LastHarvestYield; caller grants via Inventory::ServerAddItem.
+	// (Server RPCs cannot return values — UBT requirement.)
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Gather")
-	int32 ServerHarvest(bool bHasTool);
+	void ServerHarvest(bool bHasTool);
 
 	static int32 YieldFor(EResourceKind K, float T01);
 

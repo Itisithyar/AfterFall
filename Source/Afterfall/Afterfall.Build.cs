@@ -6,6 +6,11 @@ public class Afterfall : ModuleRules
 	public Afterfall(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		// UE 5.8 installed engine no longer supports Cpp17; match engine standard.
+		CppStandard = CppStandardVersion.Cpp20;
+		// V7 disables legacy public include paths: subfolder files include
+		// module-root headers (Afterfall.h) via explicit module directory.
+		PublicIncludePaths.Add(ModuleDirectory);
 
 		PublicDependencyModuleNames.AddRange(new string[]
 		{

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-#include "World/ResourceNode.h"
+#include "ResourceNode.h"
 #include "Net/UnrealNetwork.h"
 
 AResourceNode::AResourceNode()
@@ -24,11 +24,12 @@ bool AResourceNode::ServerHarvest_Validate(bool bHasTool)
 	return true;
 }
 
-int32 AResourceNode::ServerHarvest_Implementation(bool bHasTool)
+void AResourceNode::ServerHarvest_Implementation(bool bHasTool)
 {
+	LastHarvestYield = 0;
 	if (!HasAuthority())
 	{
-		return 0;
+		return;
 	}
 	// Depletion + range checks need server clock + instigator distance;
 	// caller (character interaction, 3m) enforces range. Time check stub:
@@ -38,11 +39,12 @@ int32 AResourceNode::ServerHarvest_Implementation(bool bHasTool)
 	{
 		Yield = FMath::CeilToInt(Yield * 1.5f); // hatchet +50%
 	}
-	return FMath::Max(Yield, 0);
+	LastHarvestYield = FMath::Max(Yield, 0);
 }
 
 void AResourceNode::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AResourceNode, DepletedUntilUnix);
+	DOREPLIFETIME(AResourceNode, LastHarvestYield);
 }

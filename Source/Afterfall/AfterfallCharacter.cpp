@@ -6,6 +6,7 @@
 #include "Inventory/InventoryComponent.h"
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
+#include "GameFramework/PlayerState.h"
 #include "Afterfall.h"
 
 AAfterfallCharacter::AAfterfallCharacter()
@@ -26,7 +27,7 @@ FPlacementRequest AAfterfallCharacter::BuildPreviewRequest(EStructuralPart Part,
 
 bool AAfterfallCharacter::ServerRequestPlacement_Validate(const FPlacementRequest& Request)
 {
-	return Request.GridLocation.IsFinite();
+	return !Request.GridLocation.ContainsNaN();
 }
 
 static int32 GetRequesterPlayerId(const AAfterfallCharacter* Char)

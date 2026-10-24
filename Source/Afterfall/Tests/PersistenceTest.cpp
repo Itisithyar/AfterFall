@@ -5,7 +5,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPersistenceCompatTest, "Afterfall.Persistence.Compat",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FPersistenceCompatTest::RunTest(const FString& P)
 {
 	bool bMig = false;

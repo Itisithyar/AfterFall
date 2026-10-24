@@ -6,7 +6,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFirstPlayableYieldsTest, "Afterfall.Slice.Yields",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FFirstPlayableYieldsTest::RunTest(const FString& P)
 {
 	TestEqual(TEXT("wood 3-5"), AResourceNode::YieldFor(EResourceKind::Wood, 0.999f), 5);

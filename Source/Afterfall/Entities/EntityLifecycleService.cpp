@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-#include "Entities/EntityLifecycleService.h"
+#include "EntityLifecycleService.h"
 
 bool UEntityLifecycleService::ShouldPromote(bool bDamagedOrInteracted, bool bDetectsOrPursuesOrAttacks,
 	bool bJoinedPersistentEncounter, bool bServerFlagged)

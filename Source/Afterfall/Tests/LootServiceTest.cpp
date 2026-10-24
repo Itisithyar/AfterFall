@@ -6,7 +6,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLootEntryCountTest, "Afterfall.Loot.EntryCount",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FLootEntryCountTest::RunTest(const FString& P)
 {
 	TestEqual(TEXT("min edge"), ULootService::PickEntryCount(1, 3, 0.f), 1);
@@ -16,7 +16,7 @@ bool FLootEntryCountTest::RunTest(const FString& P)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLootRarityTest, "Afterfall.Loot.Rarity",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FLootRarityTest::RunTest(const FString& P)
 {
 	TMap<FName, float> G; G.Add(TEXT("Common"), 70.f); G.Add(TEXT("Uncommon"), 25.f); G.Add(TEXT("Rare"), 4.5f); G.Add(TEXT("VeryRare"), 0.5f);
@@ -28,7 +28,7 @@ bool FLootRarityTest::RunTest(const FString& P)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLootUniqueTest, "Afterfall.Loot.SingleCopy",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FLootUniqueTest::RunTest(const FString& P)
 {
 	TestTrue(TEXT("first copy mints"), ULootService::CanMintUnique(TEXT("wp_pistol_9mm"), 0, 1));

@@ -28,9 +28,13 @@ public:
 	float ActiveRangeM = 100.f;
 
 	// Server-only: approach player, damage barricade/actor, take damage, die.
-	// Returns true while alive. Death tombstones + loot via LootService corpse table.
+	// Death tombstones + loot via LootService corpse table. Check IsAlive after.
+	// (Server RPCs cannot return values — UBT requirement.)
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Zombie")
-	bool ServerTakeDamage(float Amount);
+	void ServerTakeDamage(float Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Afterfall|Zombie")
+	bool IsAlive() const { return HP > 0.f; }
 
 	// Modular tick gate: Blueprint/AI calls this at reduced rate when dormant.
 	UFUNCTION(BlueprintCallable, Category = "Afterfall|Zombie")

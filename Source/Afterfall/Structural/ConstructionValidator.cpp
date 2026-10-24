@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-#include "Structural/ConstructionValidator.h"
+#include "ConstructionValidator.h"
 #include "Afterfall.h"
 
 int32 UConstructionValidator::GetMaterialCost(EStructuralPart Part)
