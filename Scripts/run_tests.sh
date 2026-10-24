@@ -39,6 +39,11 @@ check Source/Afterfall/Crafting/CraftingService.h
 check Source/Afterfall/Crafting/CraftingService.cpp
 check Source/Afterfall/Tests/InventoryCraftingTest.cpp
 check Scripts/validate_inventory_crafting.py
+check Source/Afterfall/Entities/EntityLifecycle.h
+check Source/Afterfall/Entities/EntityLifecycleService.h
+check Source/Afterfall/Entities/EntityLifecycleService.cpp
+check Source/Afterfall/Tests/EntityLifecycleTest.cpp
+check Scripts/validate_entity_lifecycle.py
 check Content/Data/Loot/DA_Location_RES.json
 check Content/Data/Loot/DA_Location_GAR.json
 check Content/Data/Loot/DA_Location_HW.json
@@ -56,6 +61,7 @@ if python3 Scripts/validate_loot.py; then echo "[PASS] loot profiles"; else echo
 if python3 Scripts/validate_lootservice.py; then echo "[PASS] loot service"; else echo "[FAIL] loot service"; FAIL=1; fi
 if python3 Scripts/validate_persistence.py; then echo "[PASS] persistence"; else echo "[FAIL] persistence"; FAIL=1; fi
 if python3 Scripts/validate_inventory_crafting.py; then echo "[PASS] inventory/craft"; else echo "[FAIL] inventory/craft"; FAIL=1; fi
+if python3 Scripts/validate_entity_lifecycle.py; then echo "[PASS] entity lifecycle"; else echo "[FAIL] entity lifecycle"; FAIL=1; fi
 
 # No client-authoritative placement: grep guard
 if grep -rn "ServerRequestPlacement\|ServerApplyDamage\|HasAuthority" Source/ >/dev/null; then
