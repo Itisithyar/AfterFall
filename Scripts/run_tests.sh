@@ -30,6 +30,11 @@ check Source/Afterfall/Loot/LootService.cpp
 check Source/Afterfall/Tests/LootServiceTest.cpp
 check Scripts/validate_loot.py
 check Scripts/validate_lootservice.py
+check Source/Afterfall/Persistence/RegionStateSave.h
+check Source/Afterfall/Persistence/PersistenceService.h
+check Source/Afterfall/Persistence/PersistenceService.cpp
+check Source/Afterfall/Tests/PersistenceTest.cpp
+check Scripts/validate_persistence.py
 check Content/Data/Loot/DA_Location_RES.json
 check Content/Data/Loot/DA_Location_GAR.json
 check Content/Data/Loot/DA_Location_HW.json
@@ -45,6 +50,7 @@ if python3 Scripts/validate_phase3.py; then echo "[PASS] phase3 mirror"; else ec
 echo "== Loot mirrors (python, no engine) =="
 if python3 Scripts/validate_loot.py; then echo "[PASS] loot profiles"; else echo "[FAIL] loot profiles"; FAIL=1; fi
 if python3 Scripts/validate_lootservice.py; then echo "[PASS] loot service"; else echo "[FAIL] loot service"; FAIL=1; fi
+if python3 Scripts/validate_persistence.py; then echo "[PASS] persistence"; else echo "[FAIL] persistence"; FAIL=1; fi
 
 # No client-authoritative placement: grep guard
 if grep -rn "ServerRequestPlacement\|ServerApplyDamage\|HasAuthority" Source/ >/dev/null; then
