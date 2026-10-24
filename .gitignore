@@ -22,6 +22,9 @@ Thumbs.db
 # Packaging
 *.pdb
 *.ipdb
+# Duplicate Epic-template project (source only, 134M). Canonical project is root Afterfall.uproject.
+# Template art merged to root Content/FirstPerson, Input, LevelPrototyping + Config/DefaultInput.ini.
+/AfterFall/
 # Keep project files
 !*.uproject
 !*.uplugin
