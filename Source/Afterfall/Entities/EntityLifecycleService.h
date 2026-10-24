@@ -1,5 +1,5 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-// Owner: AI (Entities) — pure transition rules. Server executes, all authority server-side.
+// Owner: AI (Entities) â€” pure transition rules. Server executes, all authority server-side.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -29,4 +29,8 @@ public:
 
 	// Death container rule: exactly one grouped container per death.
 	static bool IsValidDeathContainerCount(int32 ContainerCount);
+
+	// Damage-triggered persistence: undamaged zombies must not get individual records
+	static bool ShouldCreateDamageRecord(bool bHasBeenDamaged, bool bIsConfirmedHit);
+	static bool ShouldPersistZombieDamage(bool bHasDamageRecord);
 };

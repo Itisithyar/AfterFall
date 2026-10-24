@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "AFTERFALL - stylized multiplayer survival vertical slice (UE 5.8, C++).",
+	"Description": "AFTERFALL Real Game — authoritative integration target (UE 5.8, C++). Ported verified systems from the Come Up Game source project.",
 	"Modules": [
 		{
 			"Name": "Afterfall",
@@ -16,6 +16,10 @@
 	"Plugins": [
 		{
 			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "ProceduralMeshComponent",
 			"Enabled": true
 		},
 		{

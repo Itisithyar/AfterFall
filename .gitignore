@@ -6,6 +6,11 @@ Intermediate/
 Saved/
 # Build artifacts
 Build/
+Builds/
+*.sln
+*.slnx
+*.suo
+*.user
 # VS artifacts
 .vs/
 *.VC.db
@@ -37,3 +42,14 @@ Content/**/*.bak/*
 !Config/**/*.ini
 !Content/**/*.uasset
 !*.sh
+
+# Retired fork artifacts: build outputs, generated solution files and stray
+# template-project copies left after the 2026-10-24 consolidation. The canonical
+# project now lives at the repository root (RealGame.uproject).
+/Real Game/
+
+# Stray template-project copies and scratch build logs at the repo root.
+/AfterFall 5.8/
+/Afterfall 5.8/
+_*.txt
+_*.log

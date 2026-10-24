@@ -1,0 +1,49 @@
+{
+  "tasks": [
+    {
+      "id": "muse-mat-001",
+      "owner": "Muse Spark",
+      "state": "complete",
+      "title": "Finish physical inventory mat implementation (radial Access/Pack Up wiring — verified 28/28 + 9/9)",
+      "files": [
+        "Source/Afterfall/Interaction/MatInteractionComponent.h",
+        "Source/Afterfall/Interaction/MatInteractionComponent.cpp"
+      ],
+      "next_action": "Claim and implement; run build/tests; update handoff."
+    },
+    {
+      "id": "kilo-box-001",
+      "owner": "Kilo",
+      "state": "authorized",
+      "title": "Spawn one small box near player start on Lvl_FirstPerson (runtime spawn, map asset untouched)",
+      "files": [
+        "Source/Afterfall/AfterfallGameMode.h",
+        "Source/Afterfall/AfterfallGameMode.cpp"
+      ],
+      "acceptance": [
+        "Exactly one APhysicalItem spawns on Lvl_FirstPerson server BeginPlay; other maps unaffected",
+        "Lvl_FirstPerson.umap byte-identical (md5 9f9988334c60c6a3c0473c685028b2f6)",
+        "Diff limited to the two GameMode files; no config/packaging/boundary changes",
+        "Build + Automation + afRoomSelfTest 9/9 green in Real Game"
+      ],
+      "next_action": "Implement per Real Game/Docs/PHYSICS-BOX-TASK.md delegation order; report diff + evidence."
+    },
+    {
+      "id": "muse-physics-001",
+      "owner": "Kilo",
+      "state": "claimed",
+      "title": "Implement physics system per master list",
+      "files": [
+        "Source/Afterfall/Physics/PhysicsTestSubsystem.h",
+        "Source/Afterfall/Physics/PhysicsTestSubsystem.cpp"
+      ],
+      "acceptance": [
+        "Gravity/free-fall displacement measured and logged",
+        "Collision response verified",
+        "Mass-dependent impulse response verified",
+        "Friction and settling verified"
+      ],
+      "next_action": "Implement physics increments; run build/tests; update handoff."
+    }
+  ]
+}

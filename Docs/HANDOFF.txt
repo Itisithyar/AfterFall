@@ -1,0 +1,12 @@
+CURRENT CHECKPOINT:
+Physics subsystem compiles; runtime unverified. Headless run hung during asset loading. Owner must run afPhysicsTest in the Unreal Editor. Game remains open; baseline 9/9 intact. No further changes.
+
+Current state: Physics compiles; runtime UNVERIFIED. Headless run hung during asset loading.
+Known-good baseline: 9/9 ROOMTEST PASS (Saved/RoomTest/ue_runtime_20261024_095639.out).
+Running-process constraints: game open; do not close/restart.
+Unverified: physics runtime behavior.
+Last completed action: dependency map + physics test subsystem (compiles).
+Single next action: owner runs afPhysicsTest in Unreal Editor.
+Blockers: headless asset loading; editor interaction required.
+Evidence to resolve: PHYSICSTEST log output with pass/fail counts.
+DO NOT PROCEED PAST THIS BOUNDARY: no source changes until runtime verification resolved or owner approves.

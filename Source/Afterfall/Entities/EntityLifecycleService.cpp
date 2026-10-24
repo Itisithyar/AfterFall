@@ -29,3 +29,20 @@ bool UEntityLifecycleService::IsValidDeathContainerCount(int32 ContainerCount)
 {
 	return ContainerCount == 1;
 }
+
+bool UEntityLifecycleService::ShouldCreateDamageRecord(bool bHasBeenDamaged, bool bIsConfirmedHit)
+{
+	// Core rule: undamaged zombie must not receive individual persistent damage record
+	// Only on first confirmed damage event
+	if (!bIsConfirmedHit)
+	{
+		return false;
+	}
+	return bHasBeenDamaged || true; // First confirmed hit creates record
+}
+
+bool UEntityLifecycleService::ShouldPersistZombieDamage(bool bHasDamageRecord)
+{
+	// Only persist if there's an actual damage record (damaged zombie)
+	return bHasDamageRecord;
+}

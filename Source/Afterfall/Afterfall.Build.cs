@@ -19,7 +19,13 @@ public class Afterfall : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"NetCore"
+			"NetCore",
+			"PhysicsCore",
+			// Voxel chunk meshes are built at runtime from voxel occupancy
+			// (exposed faces only) and need runtime collision built with them.
+			// Engine ships this module (Plugin: ProceduralMeshComponent,
+			// EnabledByDefault=true); nothing else in the project uses it.
+			"ProceduralMeshComponent"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]

@@ -1,11 +1,15 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-// Owner: Gameplay (World) — server-authoritative harvest. Placeholders OK for slice.
-// Deterministic Guid + DepletedUntil; visuals/progress handled in Blueprint.
+// Owner: Gameplay (World) — server-authoritative harvest. Visible slice mesh
+// (engine basic shape per kind) so no art asset is required. Implements
+// IInteractable: prompt + range/depletion checks + single validated grant.
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Interaction/Interactable.h"
 #include "ResourceNode.generated.h"
+
+class UStaticMeshComponent;
 
 UENUM(BlueprintType)
 enum class EResourceKind : uint8
@@ -16,12 +20,17 @@ enum class EResourceKind : uint8
 };
 
 UCLASS()
-class AFTERFALL_API AResourceNode : public AActor
+class AFTERFALL_API AResourceNode : public AActor, public IInteractable
 {
 	GENERATED_BODY()
 
 public:
 	AResourceNode();
+
+	// IInteractable (prompt + pre-check client-side, execution server-side).
+	virtual FText GetInteractPrompt_Implementation() const override;
+	virtual bool CanInteract_Implementation(AController* Caller) const override;
+	virtual void ServerInteract_Implementation(AController* Caller) override;
 
 	UPROPERTY(EditAnywhere, Category = "Afterfall|Node")
 	EResourceKind Kind = EResourceKind::Wood;
@@ -40,6 +49,10 @@ public:
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Gather")
 	int32 LastHarvestYield = 0;
 
+	// Slice respawn delay after a successful harvest.
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Node")
+	float RespawnDelaySec = 60.f;
+
 	// Server-only harvest. Validates range (<3m), not depleted, tool bonus.
 	// Result in LastHarvestYield; caller grants via Inventory::ServerAddItem.
 	// (Server RPCs cannot return values — UBT requirement.)
@@ -48,6 +61,15 @@ public:
 
 	static int32 YieldFor(EResourceKind K, float T01);
 
+	bool IsDepleted() const;
+
 protected:
+	UPROPERTY(VisibleAnywhere, Category = "Afterfall|Node")
+	UStaticMeshComponent* Mesh = nullptr;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+private:
+	/** Deterministic slice yield (midpoint) so tests and game agree. */
+	int32 SliceYield(bool bHasTool) const;
 };

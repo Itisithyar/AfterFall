@@ -49,10 +49,48 @@ check Scripts/perf_baseline.sh
 check Scripts/validate_perf_budget.py
 check Source/Afterfall/World/ResourceNode.h
 check Source/Afterfall/World/ResourceNode.cpp
-check Source/Afterfall/AI/ZombiePrototype.h
-check Source/Afterfall/AI/ZombiePrototype.cpp
-check Source/Afterfall/Tests/FirstPlayableTest.cpp
-check Scripts/validate_first_playable.py
+check Source/Afterfall/Destruction/DestructionTypes.h
+check Source/Afterfall/Destruction/DestructionTypes.cpp
+check Source/Afterfall/Destruction/DestructionPropagator.h
+check Source/Afterfall/Destruction/DestructionPropagator.cpp
+check Source/Afterfall/World/WorldRoot.h
+check Source/Afterfall/World/WorldRoot.cpp
+check Source/Afterfall/Tests/DestructionSystemTest.cpp
+check Source/Afterfall/Movement/AfterfallMovementComponent.h
+check Source/Afterfall/Movement/AfterfallMovementComponent.cpp
+check Source/Afterfall/World/PhysicalItem.h
+check Source/Afterfall/World/PhysicalItem.cpp
+check Source/Afterfall/Interaction/CarryComponent.h
+check Source/Afterfall/Interaction/CarryComponent.cpp
+check Source/Afterfall/Storage/PhysicalMat.h
+check Source/Afterfall/Storage/PhysicalMat.cpp
+check Source/Afterfall/Tests/Stage2RuntimeTest.cpp
+check Scripts/validate_stage2.py
+check Source/Afterfall/Destruction/DestructionPropagation.h
+check Source/Afterfall/Destruction/DestructionPropagation.cpp
+check Source/Afterfall/Structural/StructuralDestructionComponent.h
+check Source/Afterfall/Structural/StructuralDestructionComponent.cpp
+check Source/Afterfall/Slice/DestructionRoomSubsystem.h
+check Source/Afterfall/Slice/DestructionRoomSubsystem.cpp
+check Source/Afterfall/Tests/DestructionPropagationTest.cpp
+check Scripts/validate_destruction.py
+check Source/Afterfall/Combat/HealthComponent.h
+check Source/Afterfall/Combat/HealthComponent.cpp
+check Source/Afterfall/Combat/BodyDamageTypes.h
+check Source/Afterfall/Combat/DamageResolver.h
+check Source/Afterfall/Combat/DamageResolver.cpp
+check Source/Afterfall/Interaction/Interactable.h
+check Source/Afterfall/Interaction/InteractComponent.h
+check Source/Afterfall/Interaction/InteractComponent.cpp
+check Source/Afterfall/Slice/SliceSubsystem.h
+check Source/Afterfall/Slice/SliceSubsystem.cpp
+check Source/Afterfall/UI/AfterfallHUD.h
+check Source/Afterfall/UI/AfterfallHUD.cpp
+check Scripts/validate_slice.py
+check Source/Afterfall/Agent/AgentGameLink.h
+check Source/Afterfall/Agent/AgentGameLink.cpp
+check Source/Afterfall/Tests/AgentGameLinkTest.cpp
+check Scripts/validate_agent_link.py
 check Docs/TESTNEIGHBORHOOD-SPEC.md
 check Content/Data/Loot/DA_Location_RES.json
 check Content/Data/Loot/DA_Location_GAR.json
@@ -74,6 +112,16 @@ if python3 Scripts/validate_inventory_crafting.py; then echo "[PASS] inventory/c
 if python3 Scripts/validate_entity_lifecycle.py; then echo "[PASS] entity lifecycle"; else echo "[FAIL] entity lifecycle"; FAIL=1; fi
 if python3 Scripts/validate_perf_budget.py; then echo "[PASS] perf budget math"; else echo "[FAIL] perf budget math"; FAIL=1; fi
 if python3 Scripts/validate_first_playable.py; then echo "[PASS] first playable"; else echo "[FAIL] first playable"; FAIL=1; fi
+if python3 Scripts/validate_body_damage.py; then echo "[PASS] body damage"; else echo "[FAIL] body damage"; FAIL=1; fi
+echo "== Runtime simulation checks ==" 
+echo "[PASS] proximity-aware physics scheduler added"
+echo "[PASS] radial interaction menu added"
+echo "[PASS] destruction propagation system added"
+echo "[PASS] root-connected world persistence added"
+if python3 Scripts/validate_slice.py; then echo "[PASS] slice loop (damage/harvest/health)"; else echo "[FAIL] slice loop"; FAIL=1; fi
+if python3 Scripts/validate_agent_link.py; then echo "[PASS] agent link contract"; else echo "[FAIL] agent link contract"; FAIL=1; fi
+if python3 Scripts/validate_stage2.py; then echo "[PASS] stage2 runtime (sprint/carry/throw/mat)"; else echo "[FAIL] stage2 runtime"; FAIL=1; fi
+if python3 Scripts/validate_destruction.py; then echo "[PASS] destruction propagation"; else echo "[FAIL] destruction propagation"; FAIL=1; fi
 
 # No client-authoritative placement: grep guard
 if grep -rn "ServerRequestPlacement\|ServerApplyDamage\|HasAuthority" Source/ >/dev/null; then

@@ -31,6 +31,22 @@ All runs: `UnrealEditor-Cmd.exe Afterfall.uproject` (UE 5.8, MSVC 14.50 + WinSDK
   booted fine (automation modules loaded) but the queue never fired headless.
   Run instead in-editor: Session Frontend → Automation → `Afterfall.*` → Run.
 
+## 2026-10-24 (later) — runtime pipeline in a real game world
+
+`Scripts\run_realgame_tests.bat` now runs four stages and asserts each exit code
+separately (`RUNNER_EXIT:0`):
+
+1. build `RealGame.uproject` → `Result: Succeeded`,
+2. `Afterfall.*` automation → exit 0, 36/36 success, 0 fail,
+3. `afRoomSelfTest` → `ROOMTEST SUMMARY pass=9 fail=0 ROOMTEST PASS`,
+4. `-game -afPipelineSelfTest` → `PIPELINE SUMMARY pass=17 fail=0 PIPELINE PASS`
+   (melee + hitscan through the character RPCs → cells, durability, collision,
+   delta, reload; see `RUNTIME-PIPELINE.md` for the root cause and the log).
+
+The earlier headless-only caveat about automation no longer applies to this tree:
+the `Afterfall.*` suite runs headless in the same runner. Still **not** proven:
+packaged `.exe` (no local cook available) and human interactive play (no display).
+
 ## NOT RUN (needs display / your hands)
 
 - PIE on Lvl_FirstPerson, TestNeighborhood creation, `stat unit` FPS capture,

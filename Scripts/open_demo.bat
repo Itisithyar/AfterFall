@@ -9,9 +9,9 @@ if not exist "%UE%" (
   pause & exit /b 1
 )
 echo [1/2] Opening template demo map (no compile needed)...
-start "" "%UE%" "%~dp0..\AfterFall\AfterFall.uproject" /Game/FirstPerson/Lvl_FirstPerson -game -log -windowed -ResX=1280 -ResY=720
+start "" "%UE%" "%~dp0..\RealGame.uproject" /Game/FirstPerson/Lvl_FirstPerson -game -log -windowed -ResX=1280 -ResY=720
 echo [2/2] Canonical C++ project (needs MSVC build once):
-echo   Right-click Afterfall.uproject - Generate Visual Studio project files
+echo   Right-click RealGame.uproject - Generate Visual Studio project files
 echo   Then: bash Scripts/build.sh editor
-echo   Then open Afterfall.uproject - Play on Lvl_FirstPerson, later TestNeighborhood.
+echo   Then open RealGame.uproject - Play on Lvl_FirstPerson, later TestNeighborhood.
 pause

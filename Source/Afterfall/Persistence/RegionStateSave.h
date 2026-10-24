@@ -1,10 +1,11 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
-// Owner: Tech (Persistence) — delta-only saves. Never store static regen content.
+// Owner: Tech (Persistence) â€” delta-only saves. Never store static regen content.
 // Versioned: RegionSaveVersion + GeneratorVersion + LootTableVersion.
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Loot/LootProfiles.h"
+#include "AI/ZombiePrototype.h"
 #include "RegionStateSave.generated.h"
 
 USTRUCT(BlueprintType)
@@ -20,6 +21,12 @@ struct FStructureDelta
 	UPROPERTY() int32 OwnerPlayerId = -1;
 	UPROPERTY() bool bClaimed = false;
 	UPROPERTY() bool bDestroyed = false;
+	/** Detached 3x3x3 destruction cells (0..26). Empty = intact. Additive field. */
+	UPROPERTY() TArray<int32> DetachedCells;
+	/** Material-failure propagation already fired (else reload would re-trigger). */
+	UPROPERTY() bool bFailed = false;
+	/** Bounded recent destruction event ids (cap 8) for replay protection. */
+	UPROPERTY() TArray<FGuid> RecentEventIds;
 };
 
 USTRUCT(BlueprintType)
@@ -66,6 +73,48 @@ struct FClaimDelta
 };
 
 USTRUCT(BlueprintType)
+struct FZombieDamageDelta
+{
+	GENERATED_BODY()
+	UPROPERTY() FGuid StableId;
+	UPROPERTY() FVector_NetQuantize Home = FVector::ZeroVector;
+	UPROPERTY() FVector_NetQuantize Position = FVector::ZeroVector;
+	UPROPERTY() int32 HP = 100;
+	// Indexed by EBodyPart (0-5). TArrays: raw C arrays are not UPROPERTY-safe.
+	UPROPERTY() TArray<float> PerPartDamage;
+	UPROPERTY() TArray<float> PerPartHealth;
+	UPROPERTY() TArray<bool> bPartDamaged;
+	UPROPERTY() float TotalDealt = 0.f;
+	UPROPERTY() TArray<FName> StatusEffects;
+	UPROPERTY() bool bDead = false;
+	UPROPERTY() int64 TimestampUnix = 0;
+
+	/** Snapshot a live server-side record. Only call when it HasRecord. */
+	static FZombieDamageDelta FromRecord(const FZombieDamageRecord& R, FVector HomeLoc, FVector Pos, int32 HPNow, bool bIsDead)
+	{
+		FZombieDamageDelta D;
+		D.StableId = R.StableId;
+		D.Home = HomeLoc;
+		D.Position = Pos;
+		D.HP = HPNow;
+		D.PerPartDamage.SetNum(6);
+		D.PerPartHealth.SetNum(6);
+		D.bPartDamaged.SetNum(6);
+		for (int32 i = 0; i < 6; ++i)
+		{
+			D.PerPartDamage[i] = R.PerPart[i];
+			D.PerPartHealth[i] = R.PerPartHealth[i];
+			D.bPartDamaged[i] = R.bPartDamaged[i];
+		}
+		D.TotalDealt = R.TotalDealt;
+		D.StatusEffects = R.StatusEffects;
+		D.bDead = bIsDead;
+		D.TimestampUnix = FDateTime::UtcNow().ToUnixTimestamp();
+		return D;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FRegionStateSave
 {
 	GENERATED_BODY()
@@ -79,4 +128,5 @@ struct FRegionStateSave
 	UPROPERTY() TArray<FGatherNodeDelta> Nodes;
 	UPROPERTY() TArray<FVehicleDelta> Vehicles;
 	UPROPERTY() TArray<FClaimDelta> Claims;
+	UPROPERTY() TArray<FZombieDamageDelta> Zombies; // Only damaged zombies get individual records
 };
