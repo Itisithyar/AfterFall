@@ -1,0 +1,32 @@
+{
+  "LocationId": "ZMB",
+  "DisplayName": "Zombie Corpse (+OUT gathering ref)",
+  "TableVersion": 1,
+  "Grade": { "Common": 70.0, "Uncommon": 25.0, "Rare": 4.5, "VeryRare": 0.5 },
+  "CategoryMixBase": {
+    "FOOD": 20, "MED": 12, "TOOL": 6, "BLD": 0, "MAT": 14, "WPN": 4,
+    "CLO": 28, "VEH": 0, "ELC": 4, "FRM": 0, "TRD": 10, "SPC": 2
+  },
+  "Archetypes": {
+    "civilian": "base",
+    "worker": { "TOOL": 26, "MAT": 20, "CLO": 22, "FOOD": 10, "MED": 8, "TRD": 8, "WPN": 2, "ELC": 4 },
+    "police": { "WPN": 24, "CLO": 30, "MED": 12, "FOOD": 10, "TOOL": 8, "TRD": 8, "MAT": 6, "ELC": 2 },
+    "soldier": { "WPN": 34, "CLO": 24, "MED": 14, "FOOD": 8, "SPC": 8, "TOOL": 6, "MAT": 4, "TRD": 2 }
+  },
+  "Containers": [
+    { "Type": "cp_corpse", "Count": 1, "Entries": [1, 3], "EmptyPct": 45, "Allow": ["CLO", "FOOD", "TRD", "MED", "TOOL"] }
+  ],
+  "Rules": {
+    "SearchSeconds": 5,
+    "SearchInterruptable": true,
+    "SearchNoise": true,
+    "DespawnAfterLoot": true,
+    "ArchetypeSetAtSpawn": true
+  },
+  "OutNodesRef": {
+    "tree": { "Yield": ["res_wood_log 3-5"], "Seconds": 14, "RegrowDays": 30 },
+    "boulder": { "Yield": ["res_stone 4-8"], "Seconds": 25, "RegrowDays": 14 },
+    "hemp": { "Yield": ["res_hemp_fiber 2-4"], "Seconds": 4, "RegrowDays": 3 }
+  },
+  "Notes": "Archetype fixed at zombie spawn (server), not at loot time. 60% effective empty via 45% container-empty + 0-2 entries averaging. Soldier SPC 8 = rare NVG/battery path, capped."
+}

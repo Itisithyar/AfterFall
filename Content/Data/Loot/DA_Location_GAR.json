@@ -1,0 +1,48 @@
+{
+  "LocationId": "GAR",
+  "DisplayName": "Garage / Auto Shop (reference)",
+  "TableVersion": 1,
+  "Grade": { "Common": 60.0, "Uncommon": 30.0, "Rare": 9.0, "VeryRare": 1.0 },
+  "CategoryMix": {
+    "FOOD": 2, "MED": 2, "TOOL": 22, "BLD": 2, "MAT": 14, "WPN": 0,
+    "CLO": 4, "VEH": 44, "ELC": 6, "FRM": 0, "TRD": 0, "SPC": 4
+  },
+  "Containers": [
+    { "Type": "cp_toolbox", "Count": 6, "Entries": [1, 3], "EmptyPct": 25, "Allow": ["TOOL", "MAT", "BLD", "VEH"] },
+    { "Type": "cp_shelf_industrial", "Count": 6, "Entries": [1, 4], "EmptyPct": 25, "Allow": ["MAT", "BLD", "TOOL", "ELC", "VEH"] },
+    { "Type": "cp_locker", "Count": 2, "Entries": [1, 3], "EmptyPct": 35, "Allow": ["CLO", "FOOD", "TOOL", "TRD", "SPC"] },
+    { "Type": "cp_desk", "Count": 1, "Entries": [0, 2], "EmptyPct": 40, "Allow": ["ELC", "TRD", "SPC", "FOOD"] },
+    { "Type": "cp_pallet", "Count": 2, "Entries": [2, 5], "EmptyPct": 30, "Allow": ["MAT", "BLD", "TOOL"] }
+  ],
+  "Pools": {
+    "VEH": {
+      "Common": [{ "Item": "res_scrap_metal", "W": 50, "Qty": [1, 3] }, { "Item": "veh_fuel_can_empty", "W": 10, "Qty": [1, 1] }],
+      "Uncommon": [{ "Item": "veh_tire", "W": 25, "Qty": [1, 1] }, { "Item": "res_battery", "W": 25, "Qty": [1, 1] }, { "Item": "veh_fuel_can", "W": 20, "Qty": [1, 1] }],
+      "Rare": [{ "Item": "veh_engine_part", "W": 100, "Qty": [1, 1] }],
+      "VeryRare": []
+    },
+    "TOOL": {
+      "Common": [{ "Item": "tool_wrench", "W": 30, "Qty": [1, 1] }, { "Item": "res_scrap_metal", "W": 30, "Qty": [1, 2] }],
+      "Uncommon": [{ "Item": "tool_hammer", "W": 30, "Qty": [1, 1] }, { "Item": "tool_repair_kit_basic", "W": 25, "Qty": [1, 1] }],
+      "Rare": [{ "Item": "tool_bolt_cutter", "W": 20, "Qty": [1, 1] }],
+      "VeryRare": []
+    },
+    "MAT": {
+      "Common": [{ "Item": "res_scrap_metal", "W": 60, "Qty": [2, 4] }],
+      "Uncommon": [{ "Item": "mat_metal_part", "W": 30, "Qty": [1, 2] }],
+      "Rare": [],
+      "VeryRare": []
+    },
+    "SPC": {
+      "Common": [],
+      "Uncommon": [{ "Item": "book_mechanics", "W": 60, "Qty": [1, 1] }],
+      "Rare": [{ "Item": "spec_welding_kit", "W": 80, "Qty": [1, 1] }],
+      "VeryRare": []
+    }
+  },
+  "Guarantees": [
+    { "AnyOf": ["tool_wrench", "tool_repair_kit_basic"], "Chance": 0.8, "Scope": "building" },
+    { "AnyOf": ["veh_fuel_can", "veh_fuel_can_empty"], "Chance": 0.4, "Scope": "building" }
+  ],
+  "Notes": "Slice reference: ~29 expected entries. Engine part 5% of VEH-Rare; single-copy registry applies."
+}
