@@ -22,6 +22,9 @@ Thumbs.db
 # Packaging
 *.pdb
 *.ipdb
+# Quarantined broken assets (restored after in-editor fix, never cooked/shipped).
+Content/**/*.bak
+Content/**/*.bak/*
 # Duplicate Epic-template project (source only, 134M). Canonical project is root Afterfall.uproject.
 # Template art merged to root Content/FirstPerson, Input, LevelPrototyping + Config/DefaultInput.ini.
 /AfterFall/
