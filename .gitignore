@@ -1,0 +1,33 @@
+# UE5 gitignore (generated for AFTERFALL, UE 5.8, Windows client+server)
+# Compiled binaries
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+# Build artifacts
+Build/
+# VS artifacts
+.vs/
+*.VC.db
+*.opensdf
+*.sdf
+*.suo
+*.xcodeproj
+*.xcworkspace
+# Rider
+.idea/
+# OS
+.DS_Store
+Thumbs.db
+# Packaging
+*.pdb
+*.ipdb
+# Keep project files
+!*.uproject
+!*.uplugin
+!Source/**/*.cpp
+!Source/**/*.h
+!Source/**/*.cs
+!Config/**/*.ini
+!Content/**/*.uasset
+!*.sh
