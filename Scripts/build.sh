@@ -11,19 +11,19 @@ bash Scripts/check_prereqs.sh
 
 build_editor() {
   echo ">> Building editor (AfterfallEditor Win64 Development) ..."
-  "$UBT" AfterfallEditor Win64 Development -Project="$PWD/Afterfall.uproject" -WaitMutex -FromMsBuild
+  "$UBT" AfterfallEditor Win64 Development -Project="$PWD/RealGame.uproject" -WaitMutex -FromMsBuild
 }
 
 build_client() {
   echo ">> Packaging Windows client (Shipping) ..."
-  bash "$UAT" BuildCookRun -project="$PWD/Afterfall.uproject" -platform=Win64 -clientconfig=Shipping -build -cook -pak -stage -archive -archivedirectory="$PWD/Build/WindowsClient"
+  bash "$UAT" BuildCookRun -project="$PWD/RealGame.uproject" -platform=Win64 -clientconfig=Shipping -build -cook -pak -stage -archive -archivedirectory="$PWD/Build/WindowsClient"
 }
 
 build_server() {
   echo ">> Building dedicated server (Win64 Shipping) ..."
-  "$UBT" AfterfallServer Win64 Shipping -Project="$PWD/Afterfall.uproject" -WaitMutex -FromMsBuild
+  "$UBT" AfterfallServer Win64 Shipping -Project="$PWD/RealGame.uproject" -WaitMutex -FromMsBuild
   echo ">> Packaging server ..."
-  bash "$UAT" BuildCookRun -project="$PWD/Afterfall.uproject" -platform=Win64 -serverconfig=Shipping -server -cook -pak -stage -archive -archivedirectory="$PWD/Build/WindowsServer" -serverplatform=Win64 -noclient
+  bash "$UAT" BuildCookRun -project="$PWD/RealGame.uproject" -platform=Win64 -serverconfig=Shipping -server -cook -pak -stage -archive -archivedirectory="$PWD/Build/WindowsServer" -serverplatform=Win64 -noclient
 }
 
 case "$MODE" in

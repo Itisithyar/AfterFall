@@ -18,7 +18,7 @@ CASES = [
 ]
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECKS = [
-    ("uproject valid", (ROOT / "Afterfall.uproject").exists()),
+    ("uproject valid", (ROOT / "RealGame.uproject").exists()),
     ("template map present", (ROOT / "Content/FirstPerson/Lvl_FirstPerson.umap").exists()),
     ("slice spec present", (ROOT / "Docs/TESTNEIGHBORHOOD-SPEC.md").exists()),
     ("status present", (ROOT / "Docs/FIRST-PLAYABLE-STATUS.md").exists()),

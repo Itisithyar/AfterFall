@@ -6,7 +6,7 @@ FAIL=0
 
 echo "== Functional checks (no engine needed) =="
 check() { if [ -f "$1" ]; then echo "[PASS] $1"; else echo "[FAIL] $1"; FAIL=1; fi; }
-check Afterfall.uproject
+check RealGame.uproject
 check Source/Afterfall.Target.cs
 check Source/AfterfallServer.Target.cs
 check Source/AfterfallEditor.Target.cs

@@ -1,7 +1,7 @@
 # FIRST-PLAYABLE-STATUS.md — honest state (2026-10-24)
 
 ## Project identity
-- Canonical: root `Afterfall.uproject` (UE 5.8, C++ `Afterfall` module, `AfterfallServer` target, EnhancedInput). Valid JSON, module present.
+- Canonical: root `RealGame.uproject` (UE 5.8, C++ `Afterfall` module, `AfterfallServer` target, EnhancedInput). Valid JSON, module present.
 - Template source (ignored, not committed): `AfterFall/` Epic FirstPerson Blueprint project. Art merged to root `Content/FirstPerson/`, `Content/Input/`, `Content/LevelPrototyping/`, `Config/DefaultInput.ini`. `Characters/Mannequins/` (126MB) intentionally not merged.
 
 ## What exists

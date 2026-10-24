@@ -11,7 +11,7 @@ Date: 2026-10-23. Workspace was EMPTY (no .uproject, no Source, no git). Scaffol
 
 ## 2. Dependency map
 ```
-Afterfall.uproject (EngineAssociation 5.8)
+RealGame.uproject (EngineAssociation 5.8)
  ├─ Source/Afterfall.Target.cs        (Game, Windows)
  ├─ Source/AfterfallServer.Target.cs (Server, authoritative)
  ├─ Source/AfterfallEditor.Target.cs (Editor)

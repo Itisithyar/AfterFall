@@ -33,7 +33,7 @@ else
 fi
 
 # 3. Project files
-for f in Afterfall.uproject Source/Afterfall.Target.cs Source/AfterfallServer.Target.cs Source/AfterfallEditor.Target.cs; do
+for f in RealGame.uproject Source/Afterfall.Target.cs Source/AfterfallServer.Target.cs Source/AfterfallEditor.Target.cs; do
   if [ -f "$f" ]; then echo "[OK] $f"; else echo "[MISSING] $f"; PASS=0; fi
 done
 

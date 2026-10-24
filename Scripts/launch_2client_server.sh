@@ -6,7 +6,7 @@ set -euo pipefail
 MAP="${1:-TestNeighborhood}"
 UE_ROOT="/c/Program Files/Epic Games/UE_5.8"
 EDITOR="$UE_ROOT/Engine/Binaries/Win64/UnrealEditor.exe"
-PROJECT="$PWD/Afterfall.uproject"
+PROJECT="$PWD/RealGame.uproject"
 
 bash Scripts/check_prereqs.sh
 
