@@ -29,6 +29,10 @@ public:
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "Structural|Ownership")
 	bool bIsClaimed = false;
 
+	// Upgrade tier 0=twig/stick stub, 1=wood, 2=reinforced (Phase 3 vertical slice: 0->1 only).
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Structural")
+	int32 UpgradeTier = 0;
+
 	// Server-only API. Called by GameMode/ConstructionSubsystem after validation.
 	// Never call from client.
 	void ServerInitialize(const FStructuralSpec& InSpec, int32 InOwnerId);
@@ -36,8 +40,17 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerApplyDamage(float DamageAmount);
 
+	// Repair costs 1 Wood per 50 missing durability (rounded up). Server validates resources.
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerRepair();
+
+	// Upgrade 0->1 costs 2 Wood and doubles durability cap stub. Server validates.
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerUpgrade();
+
+	// Claim an unclaimed generated building part. First-claimer wins (server orders).
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerClaim(int32 ClaimerPlayerId);
 
 protected:
 	UFUNCTION()

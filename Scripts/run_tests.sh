@@ -17,8 +17,18 @@ check Source/Afterfall/AfterfallGameMode.h
 check Source/Afterfall/AfterfallCharacter.h
 check Source/Afterfall/Structural/StructuralTypes.h
 check Source/Afterfall/Structural/StructuralActor.h
+check Source/Afterfall/Structural/StructuralActor.cpp
+check Source/Afterfall/Structural/ConstructionValidator.h
+check Source/Afterfall/Structural/ConstructionValidator.cpp
+check Source/Afterfall/Inventory/InventoryComponent.h
+check Source/Afterfall/Inventory/InventoryComponent.cpp
+check Source/Afterfall/Tests/ConstructionValidatorTest.cpp
+check Scripts/validate_phase3.py
 check Config/DefaultEngine.ini
 check Config/DefaultGame.ini
+
+echo "== Phase 3b mirror (python, no engine) =="
+if python3 Scripts/validate_phase3.py; then echo "[PASS] phase3 mirror"; else echo "[FAIL] phase3 mirror"; FAIL=1; fi
 
 # No client-authoritative placement: grep guard
 if grep -rn "ServerRequestPlacement\|ServerApplyDamage\|HasAuthority" Source/ >/dev/null; then

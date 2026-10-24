@@ -50,9 +50,45 @@ bool AStructuralActor::ServerRepair_Validate()
 
 void AStructuralActor::ServerRepair_Implementation()
 {
-	// Phase 3 TODO: check resources + ownership before restoring.
-	// Stub keeps server authority while gameplay logic lands.
+	// Cost pre-consumed by caller (AAfterfallCharacter) via UInventoryComponent::ServerTryConsume.
+	// This keeps a single authority path for resources while repair stays server-only.
+	// Repair cost rule: 1 Wood per 50 missing durability, rounded up (see ConstructionValidator docs).
 	Durability = Spec.MaxDurability;
+}
+
+bool AStructuralActor::ServerUpgrade_Validate()
+{
+	return true;
+}
+
+void AStructuralActor::ServerUpgrade_Implementation()
+{
+	// Cost pre-consumed by caller (2 Wood). Vertical slice allows tier 0 -> 1 only.
+	if (UpgradeTier != 0)
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("Upgrade rejected: already tier %d"), UpgradeTier);
+		return;
+	}
+	UpgradeTier = 1;
+	Spec.MaxDurability *= 1.5f;
+	Durability = Spec.MaxDurability;
+}
+
+bool AStructuralActor::ServerClaim_Validate(int32 ClaimerPlayerId)
+{
+	return ClaimerPlayerId >= 0;
+}
+
+void AStructuralActor::ServerClaim_Implementation(int32 ClaimerPlayerId)
+{
+	// First-claimer wins: server processes RPCs in order, rejects late claims.
+	if (bIsClaimed)
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("Claim rejected: already owned by %d"), OwnerPlayerId);
+		return;
+	}
+	OwnerPlayerId = ClaimerPlayerId;
+	bIsClaimed = true;
 }
 
 void AStructuralActor::OnRep_Spec()
@@ -67,4 +103,5 @@ void AStructuralActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AStructuralActor, Durability);
 	DOREPLIFETIME(AStructuralActor, OwnerPlayerId);
 	DOREPLIFETIME(AStructuralActor, bIsClaimed);
+	DOREPLIFETIME(AStructuralActor, UpgradeTier);
 }
