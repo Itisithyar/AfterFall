@@ -24,11 +24,27 @@ check Source/Afterfall/Inventory/InventoryComponent.h
 check Source/Afterfall/Inventory/InventoryComponent.cpp
 check Source/Afterfall/Tests/ConstructionValidatorTest.cpp
 check Scripts/validate_phase3.py
+check Source/Afterfall/Loot/LootProfiles.h
+check Source/Afterfall/Loot/LootService.h
+check Source/Afterfall/Loot/LootService.cpp
+check Source/Afterfall/Tests/LootServiceTest.cpp
+check Scripts/validate_loot.py
+check Scripts/validate_lootservice.py
+check Content/Data/Loot/DA_Location_RES.json
+check Content/Data/Loot/DA_Location_GAR.json
+check Content/Data/Loot/DA_Location_HW.json
+check Content/Data/Loot/DA_Location_PHM.json
+check Content/Data/Loot/DA_Location_WRK.json
+check Content/Data/Loot/DA_Location_ZMB.json
 check Config/DefaultEngine.ini
 check Config/DefaultGame.ini
 
 echo "== Phase 3b mirror (python, no engine) =="
 if python3 Scripts/validate_phase3.py; then echo "[PASS] phase3 mirror"; else echo "[FAIL] phase3 mirror"; FAIL=1; fi
+
+echo "== Loot mirrors (python, no engine) =="
+if python3 Scripts/validate_loot.py; then echo "[PASS] loot profiles"; else echo "[FAIL] loot profiles"; FAIL=1; fi
+if python3 Scripts/validate_lootservice.py; then echo "[PASS] loot service"; else echo "[FAIL] loot service"; FAIL=1; fi
 
 # No client-authoritative placement: grep guard
 if grep -rn "ServerRequestPlacement\|ServerApplyDamage\|HasAuthority" Source/ >/dev/null; then
@@ -42,9 +58,9 @@ else
   echo "[PASS] no client-authoritative spawn detected"
 fi
 
-echo "== UE smoke (engine present? version check only) =="
+echo "== UE smoke (engine present? version check only, 15s timeout) =="
 if [ -f "/c/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe" ]; then
-  if "/c/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe" --version >/dev/null 2>&1; then
+  if timeout 15 "/c/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe" --version >/dev/null 2>&1; then
     echo "[PASS] UnrealEditor --version succeeded"
   else
     echo "[INFO] UnrealEditor present but --version returned non-zero (expected pre-first-build); full automation deferred until TestNeighborhood map + MSVC toolchain exist."
