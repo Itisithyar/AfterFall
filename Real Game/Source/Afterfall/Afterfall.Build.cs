@@ -40,6 +40,11 @@ public class Afterfall : ModuleRules
 		{
 		});
 
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
+
 		// Explicit ownership: Afterfall module owns Character, Structural, ProcGen stubs.
 		// See Docs/ARCHITECTURE.md for module ownership map.
 	}
