@@ -43,10 +43,17 @@ Content/**/*.bak/*
 !Content/**/*.uasset
 !*.sh
 
-# Retired fork artifacts: build outputs, generated solution files and stray
-# template-project copies left after the 2026-10-24 consolidation. The canonical
-# project now lives at the repository root (RealGame.uproject).
-/Real Game/
+# The old fork lives in Real Game by owner decision, and the main project is
+# layered into it. Only the fork's generated output stays ignored; the project
+# files themselves (uproject, Config, Content) are visible for layering/import.
+Real Game/Binaries/
+Real Game/Intermediate/
+Real Game/DerivedDataCache/
+Real Game/Saved/
+Real Game/Binaries_fork/
+Real Game/Intermediate_fork/
+Real Game/.vs/
+Real Game/*.sln
 
 # Stray template-project copies and scratch build logs at the repo root.
 /AfterFall 5.8/
