@@ -206,6 +206,8 @@ public:
 	// Physical-load recompute (wallet + held-slot mass -> movement state).
 	// Public: bound to Inventory::OnInventoryChanged in BeginPlay AND called
 	// by CarryComponent::SyncCarryFlag after every held-slot change.
+	// UFUNCTION required: BeginPlay binds it via AddDynamic (else ensure IsBound fails).
+	UFUNCTION()
 	void OnInventoryChangedForLoad();
 	// Pause toggle (Esc / gamepad Start). Public for the headless
 	// physics/controls fixture; still locally-controlled only.
