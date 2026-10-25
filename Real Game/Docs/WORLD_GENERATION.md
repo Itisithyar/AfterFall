@@ -127,11 +127,18 @@ including real grapple attach/release) and `Afterfall.*` automation 46/46 with
 1. **Cost is linear in actors.** 8 shells = 680 structural actors ≈ 0.35 s and
    ≈0.3 GB at map start. Raising `MaxGeometryBuildings` needs instancing or
    merging, not just a bigger number.
-2. **Streaming is server-side and radius-based.** Focuses are player pawns
+2. **Streaming is server-side, radius-based, with hysteresis.** Focuses are player pawns
    (one per controller), the update runs at 2 Hz, and the edit cache holds 64
    chunks: a chunk edited, unloaded, then evicted comes back pristine even
-   though its file entry was overwritten. Chunks stream as whole actors (no
-   LOD), and clients receive them through normal replication.
+   though its file entry was overwritten. Unload uses stream radius +
+   `HysteresisChunks` (default 1) so idling at the ring edge does not
+   oscillate; desired chunks always win cap slots over retained ones. The
+   live tick also streams each moving player's velocity-predicted position
+   (`bPredictiveStreaming`, `PredictSeconds`, clamped to one radius).
+   The damage file is versioned by terrain sampling contract
+   (`AfterfallTerrain::GeneratorVersion`) and ignores older contracts.
+   Chunks stream as whole actors (no LOD), and clients receive them through
+   normal replication.
 3. **Buildings are blockout shells.** No interiors, doors are breakable parts,
    no LODs.
 4. **No authored map.** The world is built at runtime; an authored

@@ -20,6 +20,7 @@
 
 class AStructuralActor;
 class AVoxelChunkActor;
+class APlayerController;
 
 /** All distances in meters; runtime conversion to Unreal centimeters is 100x. */
 USTRUCT(BlueprintType)
@@ -41,6 +42,16 @@ struct FAfterfallWorldConfig
 	UPROPERTY(EditAnywhere, Category = "World") int32 BuildingTarget = 160;
 	/** Hard cap on live voxel chunk actors (memory guard). */
 	UPROPERTY(EditAnywhere, Category = "World") int32 MaxTerrainChunks = 16;
+	/** Extra unload margin in whole chunks: a chunk stays loaded until it
+	 *  leaves stream radius + hysteresis (stops load/unload oscillation when
+	 *  a player idles near the ring boundary). Desired chunks always win
+	 *  cap slots over retained ones. */
+	UPROPERTY(EditAnywhere, Category = "World|Streaming") int32 HysteresisChunks = 1;
+	/** Predict each player's near-future position from velocity (live tick
+	 *  only) and include it as a stream focus. */
+	UPROPERTY(EditAnywhere, Category = "World|Streaming") bool bPredictiveStreaming = true;
+	/** Prediction horizon in seconds. Clamped to one stream radius. */
+	UPROPERTY(EditAnywhere, Category = "World|Streaming") float PredictSeconds = 2.0f;
 	/** Server builds the world when the map starts (no map authoring needed). */
 	UPROPERTY(EditAnywhere, Category = "World") bool bGenerateOnStart = true;
 	/** Keep edited chunks in Saved/WorldGen so damage survives a restart. */
@@ -224,6 +235,10 @@ public:
 private:
 	FTimerHandle AutoTimer;
 	FTimerHandle StreamTimer;
+	/** Last seen pawn location per controller, for velocity prediction. */
+	TMap<TWeakObjectPtr<const APlayerController>, FVector> LastFocusByController;
+	/** World time of the last StreamTick (< 0 before the first tick). */
+	double LastStreamTickTime = -1.0;
 	void AutoRun();
 	void StreamTick();
 	bool SpawnChunk(const FIntPoint& Coord);

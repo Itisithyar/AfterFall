@@ -18,6 +18,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "World/TerrainSampling.h"
 #include "Serialization/BufferArchive.h"
 #include "Serialization/MemoryReader.h"
 #include "Misc/FileHelper.h"
@@ -30,10 +31,13 @@ namespace
 
 	FName GeneratedTag() { return FName(TEXT("AFWorldGen")); }
 
-	// Chunk-damage file layout: 4 x int32 header (magic, version, seed, count),
-	// then per chunk 3 x int32 (X, Y, Seq) and the voxel array.
+	// Chunk-damage file layout: 5 x int32 header (magic, version, seed,
+	// terrain sampling version, count), then per chunk 3 x int32 (X, Y, Seq)
+	// and the voxel array. PersistVersion 2 adds the terrain version so
+	// edits cached under an older sampling contract are never restored onto
+	// a newer one (see AfterfallTerrain::GeneratorVersion).
 	constexpr int32 PersistMagic = 0x41464757; // AFGW
-	constexpr int32 PersistVersion = 1;
+	constexpr int32 PersistVersion = 2;
 
 	float Mb(uint64 Bytes) { return (float)Bytes / (1024.f * 1024.f); }
 
@@ -69,6 +73,16 @@ bool FAfterfallWorldConfig::Validate(FString& OutError) const
 	if (MaxTerrainChunks < 0 || MaxTerrainChunks > 256)
 	{
 		OutError = TEXT("MaxTerrainChunks must be in [0, 256]");
+		return false;
+	}
+	if (HysteresisChunks < 0 || HysteresisChunks > 8)
+	{
+		OutError = TEXT("HysteresisChunks must be in [0, 8]");
+		return false;
+	}
+	if (PredictSeconds < 0.f || PredictSeconds > 10.f)
+	{
+		OutError = TEXT("PredictSeconds must be in [0, 10]");
 		return false;
 	}
 	return true;
@@ -676,25 +690,83 @@ int32 UAfterfallWorldGenSubsystem::UpdateStreamingForFocuses(const TArray<FVecto
 		Desired.Add(P.Value);
 	}
 
-	// Unload first so the live count never exceeds the cap mid-update.
-	TArray<FIntPoint> Stale;
+	// Hysteresis: a chunk outside Desired stays loaded while it is still
+	// inside reach + hysteresis (stops load/unload oscillation when a player
+	// idles near the ring boundary). Desired chunks always win cap slots
+	// over retained ones (enforced in the spawn loop below).
+	const float HystCm = (float)FMath::Max(0, Config.HysteresisChunks) * ChunkCm;
+	const float KeepReachCm = ReachCm + HystCm;
+	auto CentreOf = [this, ChunkCm](const FIntPoint& Coord)
+	{
+		return ChunkCornerWorldCm(Coord) + FVector(ChunkCm * 0.5f, ChunkCm * 0.5f, 0.f);
+	};
+	auto NearestD2 = [&Focuses](const FVector& Centre)
+	{
+		float Best = TNumericLimits<float>::Max();
+		for (const FVector& Focus : Focuses)
+		{
+			Best = FMath::Min(Best, FVector::DistSquared2D(Centre, Focus));
+		}
+		return Best;
+	};
+
+	// Unload first so the live count never exceeds the cap mid-update,
+	// except for hysteresis-retained chunks (evicted below if over cap).
+	TArray<FIntPoint> UnloadNow;
 	for (const TPair<FIntPoint, TWeakObjectPtr<AVoxelChunkActor>>& P : LoadedChunks)
 	{
-		if (!Desired.Contains(P.Key))
+		if (Desired.Contains(P.Key))
 		{
-			Stale.Add(P.Key);
+			continue;
 		}
+		if (NearestD2(CentreOf(P.Key)) <= KeepReachCm * KeepReachCm)
+		{
+			continue; // hysteresis: keep while just outside the ring
+		}
+		UnloadNow.Add(P.Key);
 	}
-	for (const FIntPoint& Coord : Stale)
+	for (const FIntPoint& Coord : UnloadNow)
 	{
 		UnloadChunk(Coord);
 	}
 
+	const bool bCapped = Config.MaxTerrainChunks > 0;
 	for (const TPair<float, FIntPoint>& P : Wanted)
 	{
 		if (LoadedChunks.Contains(P.Value))
 		{
 			continue;
+		}
+		while (bCapped && LoadedChunks.Num() >= Config.MaxTerrainChunks)
+		{
+			// Make room for a Desired chunk: evict the farthest loaded
+			// chunk that is not Desired (a hysteresis-retained one).
+			bool bFound = false;
+		float WorstD2 = -1.f;
+		FIntPoint EvictCoord = FIntPoint::ZeroValue;
+			for (const TPair<FIntPoint, TWeakObjectPtr<AVoxelChunkActor>>& Q : LoadedChunks)
+			{
+				if (Desired.Contains(Q.Key))
+				{
+					continue;
+				}
+				const float D2 = NearestD2(CentreOf(Q.Key));
+				if (!bFound || D2 > WorstD2)
+				{
+					bFound = true;
+					WorstD2 = D2;
+					EvictCoord = Q.Key;
+				}
+			}
+			if (!bFound)
+			{
+				break; // ring is full of Desired chunks; nothing to evict
+			}
+			UnloadChunk(EvictCoord);
+		}
+		if (bCapped && LoadedChunks.Num() >= Config.MaxTerrainChunks)
+		{
+			break;
 		}
 		SpawnChunk(P.Value);
 	}
@@ -753,7 +825,7 @@ bool UAfterfallWorldGenSubsystem::SavePersistedChunks()
 	const FString Path = PersistFilePath();
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 	FBufferArchive Ar;
-	int32 Header[4] = { PersistMagic, PersistVersion, Config.Seed, All.Num() };
+	int32 Header[5] = { PersistMagic, PersistVersion, Config.Seed, AfterfallTerrain::GeneratorVersion, All.Num() };
 	Ar.Serialize(Header, sizeof(Header));
 	for (TPair<FIntPoint, FAfterfallPersistedChunk>& P : All)
 	{
@@ -786,19 +858,20 @@ int32 UAfterfallWorldGenSubsystem::LoadPersistedChunks()
 		return 0; // first run for this seed
 	}
 	FMemoryReader Ar(Bytes, true);
-	int32 Header[4] = { 0, 0, 0, 0 };
+	int32 Header[5] = { 0, 0, 0, 0, 0 };
 	Ar.Serialize(Header, sizeof(Header));
 	if (Ar.IsError() || Header[0] != PersistMagic || Header[1] != PersistVersion
-		|| Header[2] != Config.Seed || Header[3] < 0 || Header[3] > 4096)
+		|| Header[2] != Config.Seed || Header[3] != AfterfallTerrain::GeneratorVersion
+		|| Header[4] < 0 || Header[4] > 4096)
 	{
 		UE_LOG(LogAfterfall, Warning,
-			TEXT("WORLDGEN persist: ignoring %s (bad header, expected seed %d)"),
-			*Path, Config.Seed);
+			TEXT("WORLDGEN persist: ignoring %s (bad header; want seed %d terrain v%d)"),
+			*Path, Config.Seed, AfterfallTerrain::GeneratorVersion);
 		return 0;
 	}
 
 	int32 Loaded = 0;
-	for (int32 i = 0; i < Header[3] && !Ar.IsError(); ++i)
+	for (int32 i = 0; i < Header[4] && !Ar.IsError(); ++i)
 	{
 		int32 Meta[3] = { 0, 0, 0 };
 		Ar.Serialize(Meta, sizeof(Meta));
@@ -863,6 +936,7 @@ void UAfterfallWorldGenSubsystem::StreamTick()
 	// everyone instead of only player 0. With nobody playing yet the configured
 	// origin stays loaded, which is what the fixtures rely on.
 	TArray<FVector> Focuses;
+	TArray<const APlayerController*> LivePCs;
 	for (FConstPlayerControllerIterator It = W->GetPlayerControllerIterator(); It; ++It)
 	{
 		const APlayerController* PC = It->Get();
@@ -870,6 +944,53 @@ void UAfterfallWorldGenSubsystem::StreamTick()
 		if (P)
 		{
 			Focuses.Add(P->GetActorLocation());
+			LivePCs.Add(PC);
+		}
+	}
+	// Drop disconnected controllers so the prediction map cannot grow.
+	for (auto MapIt = LastFocusByController.CreateIterator(); MapIt; ++MapIt)
+	{
+		if (!MapIt.Key().IsValid())
+		{
+			MapIt.RemoveCurrent();
+		}
+	}
+	// Velocity prediction (live tick only, never in the deterministic
+	// Update* path the self-test drives): also stream where each moving
+	// player is heading, clamped to one stream radius, so generation stays
+	// ahead of walking/sprinting instead of reacting a tick late.
+	const double NowS = W->GetTimeSeconds();
+	const float Dt = (LastStreamTickTime > 0.0) ? (float)(NowS - LastStreamTickTime) : 0.f;
+	LastStreamTickTime = NowS;
+	if (Config.bPredictiveStreaming && Config.PredictSeconds > 0.f && Dt > 0.f)
+	{
+		const float MaxLeadCm = Config.StreamRadiusM * CmPerM;
+		for (const APlayerController* PC : LivePCs)
+		{
+			const APawn* P = PC ? PC->GetPawn() : nullptr;
+			const FVector* Last = PC ? LastFocusByController.Find(PC) : nullptr;
+			if (!P || !Last)
+			{
+				continue;
+			}
+			FVector Vel = (P->GetActorLocation() - *Last) / Dt;
+			// Sprint caps at 800 cm/s; clamp well above that so teleports
+			// and focus jumps never fling the predicted focus away.
+			Vel = Vel.GetClampedToMaxSize(1500.f);
+			FVector Lead = Vel * Config.PredictSeconds;
+			Lead = Lead.GetClampedToMaxSize(MaxLeadCm);
+			if (!Lead.IsNearlyZero())
+			{
+				Focuses.Add(P->GetActorLocation() + Lead);
+			}
+		}
+	}
+	for (const APlayerController* PC : LivePCs)
+	{
+		const APawn* P = PC ? PC->GetPawn() : nullptr;
+		if (P)
+		{
+			LastFocusByController.Add(PC, P->GetActorLocation());
 		}
 	}
 	if (Focuses.Num() == 0)
@@ -1237,6 +1358,24 @@ bool UAfterfallWorldGenSubsystem::RunSelfTest(bool bExit)
 	}
 	Check(HousePlacements.Num() == 0 || HouseGeometry > 0,
 		TEXT("stream-radius houses received geometry"));
+
+	// ---- hysteresis: a sub-chunk nudge must not unload anything ------------
+	// Temporarily lift the cap so the full ring is resident: then a focus
+	// move inside the same chunk only adds newly-desired chunks on the
+	// leading edge, while hysteresis retains the trailing edge (any unload
+	// would be an oscillation bug rather than cap pressure).
+	{
+		const int32 SavedCap = Config.MaxTerrainChunks;
+		Config.MaxTerrainChunks = 64;
+		const FVector BaseCm = Config.OriginM * CmPerM;
+		UpdateStreamingAt(BaseCm, true);
+		const int32 OutBefore = ChunksStreamedOut;
+		UpdateStreamingAt(BaseCm + FVector(Config.ChunkSizeM() * CmPerM * 0.25f, 0.f, 0.f), true);
+		Check(ChunksStreamedOut == OutBefore,
+			TEXT("sub-chunk focus nudge unloads nothing (hysteresis)"));
+		Config.MaxTerrainChunks = SavedCap;
+		UpdateStreamingAt(BaseCm, true);
+	}
 
 	// ---- streaming: the chunk ring follows the focus ----------------------
 	AVoxelChunkActor* EditTarget = nullptr;
