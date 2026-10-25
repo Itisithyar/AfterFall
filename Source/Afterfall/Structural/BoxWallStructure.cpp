@@ -309,12 +309,38 @@ void ABoxWallStructure::OnBlockHit(UPrimitiveComponent* /*HitComp*/,
 	{
 		return; // low-energy contacts (footsteps, brushes) are ignored
 	}
+	// Wall-level collision key: same body/wall/0.1s window share one key.
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const int64 Key = (int64)(OtherActor ? OtherActor->GetUniqueID() : 0) * 7919LL
+		+ (int64)GetUniqueID() * 104729LL
+		+ (int64)(Now / 0.10);
+	// expire old
+	for (auto It = RecentImpactKeys.CreateIterator(); It; ++It)
+	{
+		if (It.Value() <= (float)Now) It.RemoveCurrent();
+	}
+	if (RecentImpactKeys.Contains(Key))
+	{
+		UE_LOG(LogTemp, Log, TEXT("[IMPACT-DEDUP] guid=key-%lld result=SKIPPED"), (long long)Key);
+		return;
+	}
+	if (RecentImpactKeys.Num() >= 8)
+	{
+		// evict oldest
+		int64 OldestKey = 0; float OldestTime = FLT_MAX;
+		for (const auto& P : RecentImpactKeys)
+		{
+			if (P.Value < OldestTime) { OldestTime = P.Value; OldestKey = P.Key; }
+		}
+		RecentImpactKeys.Remove(OldestKey);
+	}
+	RecentImpactKeys.Add(Key, (float)(Now + 1.0));
 	FBoxImpactInput In;
 	In.EffectiveMassKg = MassKg * ThrownBodyEnergyScale;
 	In.RelativeSpeedCmS = SpeedCmS;
 	const FGuid EventId = FGuid::NewGuid();
 	UE_LOG(LogTemp, Log, TEXT("[IMPACT] frame=%llu time=%f wall=%s other=%s guid=%s speed_cms=%f energy_J=%f"),
-		(unsigned long long)GFrameCounter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f, *GetName(), OtherActor ? *OtherActor->GetName() : TEXT("None"), *EventId.ToString(), SpeedCmS, 0.5f * (MassKg * ThrownBodyEnergyScale) * FMath::Square(SpeedCmS / 100.f));
+		(unsigned long long)GFrameCounter, (float)Now, *GetName(), OtherActor ? *OtherActor->GetName() : TEXT("None"), *EventId.ToString(), SpeedCmS, 0.5f * (MassKg * ThrownBodyEnergyScale) * FMath::Square(SpeedCmS / 100.f));
 	ServerApplyBoxImpact(Hit.ImpactPoint, VelOther.GetSafeNormal(), In, EventId);
 }
 

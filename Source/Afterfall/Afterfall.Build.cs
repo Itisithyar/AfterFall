@@ -25,7 +25,10 @@ public class Afterfall : ModuleRules
 			// (exposed faces only) and need runtime collision built with them.
 			// Engine ships this module (Plugin: ProceduralMeshComponent,
 			// EnabledByDefault=true); nothing else in the project uses it.
-			"ProceduralMeshComponent"
+			"ProceduralMeshComponent",
+			"UMG",
+			"Slate",
+			"SlateCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]

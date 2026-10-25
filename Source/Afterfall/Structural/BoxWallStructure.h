@@ -112,6 +112,8 @@ private:
 	TMap<int32, UStaticMeshComponent*> BlockComps;
 	UPROPERTY()
 	TArray<FGuid> RecentEventIds; ///< cap 8 like StructuralActor
+	UPROPERTY()
+	TMap<int64, float> RecentImpactKeys; ///< key -> expiry (seconds); wall-level dedup
 	bool bInitialized = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "BoxWall")
