@@ -22,7 +22,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, Category="Afterfall|Test")
-	bool bSpawnTestBuilding = false;
+	bool bSpawnTestTerrain = false;
 
 private:
 	/**

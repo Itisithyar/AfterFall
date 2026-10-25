@@ -12,7 +12,7 @@
 #include "Components/LightComponent.h"
 #include "Engine/PostProcessVolume.h"
 #include "EngineUtils.h"
-#include "Building/ProceduralBuilding.h"
+#include "Building/ProceduralTerrain.h"
 
 AAfterfallGameMode::AAfterfallGameMode()
 {
@@ -26,14 +26,14 @@ void AAfterfallGameMode::BeginPlay()
 	Super::BeginPlay();
 	SpawnAuthorizedTestBox();
 	GetWorldTimerManager().SetTimerForNextTick(this, &AAfterfallGameMode::DeferredLightCheck);
-	if (bSpawnTestBuilding)
+	if (bSpawnTestTerrain)
 	{
 		UWorld* W = GetWorld();
 		if (W)
 		{
 			FActorSpawnParameters P;
 			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-			W->SpawnActor<AProceduralBuilding>(AProceduralBuilding::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, P);
+			W->SpawnActor<AProceduralTerrain>(AProceduralTerrain::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, P);
 		}
 	}
 }
