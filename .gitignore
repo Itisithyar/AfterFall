@@ -63,3 +63,6 @@ _*.log
 /VaultCache/
 /.build_monitor/
 Scripts/__pycache__/
+
+# Consolidation recovery bundle (local backup artifact, not source).
+/Recovery-*.bundle
