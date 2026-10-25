@@ -1,8 +1,17 @@
 #include "ProceduralBuilding.h"
 #include "Afterfall.h"
+#include "Components/SceneComponent.h"
 #include "Geometry/GeometryTypes.h"
 
-AProceduralBuilding::AProceduralBuilding() { PrimaryActorTick.bCanEverTick = false; }
+AProceduralBuilding::AProceduralBuilding()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	// Sections attach to this root: without one, AttachToComponent(nullptr)
+	// silently no-ops and every section registers at the world origin instead
+	// of the actor's spawn location (verified in afFragmentDemo PIE run).
+	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	SetRootComponent(Root);
+}
 
 void AProceduralBuilding::BeginPlay() { Super::BeginPlay(); RebuildBuilding(); }
 
@@ -38,6 +47,22 @@ void AProceduralBuilding::BuildFloor(int32 FloorIndex)
 		PMC->RegisterComponent();
 		PMC->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 		PMC->CreateMeshSection(0, V, T, N, U, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+		// Simple (convex) collision alongside the render mesh. A flat quad gives
+		// Chaos a zero-volume hull it rejects, so SetSimulatePhysics() in
+		// FragmentBuilding silently no-ops (afFragmentDemo showed simulating=0,
+		// mass=1.0). An extruded box hull gives every section a simulatable body.
+		{
+			FBox Bounds(V);
+			Bounds = Bounds.ExpandBy(FMath::Max(WallThickness, 1.f) * 0.5f);
+			const FVector Mn = Bounds.Min, Mx = Bounds.Max;
+			TArray<FVector> Corners;
+			Corners.Reserve(8);
+			Corners.Add(FVector(Mn.X, Mn.Y, Mn.Z)); Corners.Add(FVector(Mx.X, Mn.Y, Mn.Z));
+			Corners.Add(FVector(Mx.X, Mx.Y, Mn.Z)); Corners.Add(FVector(Mn.X, Mx.Y, Mn.Z));
+			Corners.Add(FVector(Mn.X, Mn.Y, Mx.Z)); Corners.Add(FVector(Mx.X, Mn.Y, Mx.Z));
+			Corners.Add(FVector(Mx.X, Mx.Y, Mx.Z)); Corners.Add(FVector(Mn.X, Mx.Y, Mx.Z));
+			PMC->AddCollisionConvexMesh(Corners);
+		}
 		PMC->ComponentTags.Add(FName(*F.tag));
 		PMC->ComponentTags.Add(FName(*FString::Printf(TEXT("Floor%d"), FloorIndex)));
 	}
@@ -83,9 +108,10 @@ void AProceduralBuilding::FragmentBuilding()
 			const FVector SecWorld = PMC->GetComponentLocation();
 			const FVector Impulse = FragmentImpulseFor(SecWorld, Epicenter,
 				FragmentStrength, FragmentFalloffRadius, FragmentJitter, Stream);
-			// Velocity-change impulse applied at the section's own center: the piece
-			// both translates away from the blast and torques about its centroid.
-			PMC->AddImpulseAtLocation(Impulse, SecWorld, NAME_None);
+			// Velocity-change impulse: FragmentStrength is a speed (cm/s), so a
+			// heavy slab and a thin panel scatter alike instead of Delta-v = J/m
+			// ending up negligible on a multi-ton section.
+			PMC->AddImpulse(Impulse, NAME_None, /*bVelChange=*/true);
 			++NumSections;
 		}
 	}
