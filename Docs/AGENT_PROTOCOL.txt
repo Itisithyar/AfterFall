@@ -12,3 +12,4 @@ Use small reviewable changes; run relevant tests after authorized source changes
 Do not make unrelated edits or silently expand task scope.
 Status labels: VERIFIED, FAILED, BLOCKED, NOT RUN, UNVERIFIED.
 HANDOFF.txt = current status. GOALS.txt = project direction. PROGRESS_LOG.txt = historical evidence.
+Work ONLY in your worktree folder. Never switch branches in Come Up Game.
