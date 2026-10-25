@@ -21,6 +21,11 @@ public class Afterfall : ModuleRules
 			"EnhancedInput",
 			"NetCore",
 			"PhysicsCore",
+			// UMG + Slate: the Tab inventory mat is a native UUserWidget built
+			// from C++ (no .uasset widgets), so the module must link UMG itself.
+			"UMG",
+			"Slate",
+			"SlateCore",
 			// Voxel chunk meshes are built at runtime from voxel occupancy
 			// (exposed faces only) and need runtime collision built with them.
 			// Engine ships this module (Plugin: ProceduralMeshComponent,

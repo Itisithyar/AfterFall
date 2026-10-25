@@ -233,8 +233,9 @@ void AAfterfallHUD::DrawHUD()
 	// Quick menu (top-left, content-sized, game visible around it).
 	DrawQuickMenu(Pawn, Font, VS, FPlatformTime::Seconds());
 
-	// Inventory overlay (Canvas-drawn, zero UMG).
-	if (Pawn->IsInventoryOpen())
+	// Inventory overlay (Canvas-drawn, zero UMG). Suppressed while the Tab
+	// inventory mat widget is up — the mat replaces it 1:1.
+	if (Pawn->IsInventoryOpen() && !Pawn->IsInventoryMatOpen())
 	{
 		DrawInventory(Pawn, Font, VS);
 	}
@@ -720,11 +721,23 @@ bool AAfterfallHUD::HandleInventoryInput(AAfterfallCharacter* Pawn)
 		return false;
 	}
 
-	if (PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape))
+	// Tab is handled ONCE by the Enhanced Input binding (IA_Inventory ->
+	// OnInventoryPressed -> ToggleInventory). Handling it here as well made a
+	// single press toggle twice in the same frame (open then close), which is
+	// why Tab looked broken. Escape stays as the HUD-side way out.
+	if (PC->WasInputKeyJustPressed(EKeys::Escape))
 	{
 		Pawn->CloseInventory();
 		InventorySelectedSlot = -1;
 		InventoryHoveredSlot = -1;
+		return true;
+	}
+
+	// The mat widget owns slot selection (mouse click, select/swap) while it
+	// is up: swallow the canvas inventory's nav/use/drop keys so the two
+	// interfaces cannot act on different inventories at once.
+	if (Pawn->IsInventoryMatOpen())
+	{
 		return true;
 	}
 

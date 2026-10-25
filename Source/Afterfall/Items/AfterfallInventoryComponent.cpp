@@ -48,6 +48,16 @@ bool UAfterfallInventoryComponent::HasItem(FName ID, int32 Qty) const
 	return Total >= Qty;
 }
 
+void UAfterfallInventoryComponent::SwapSlots(int32 IndexA, int32 IndexB)
+{
+	if (IndexA == IndexB || !Slots.IsValidIndex(IndexA) || !Slots.IsValidIndex(IndexB))
+	{
+		return; // out of range: leave the mat exactly as it was
+	}
+	Slots.Swap(IndexA, IndexB);
+	OnInventoryChanged.Broadcast();
+}
+
 bool UAfterfallInventoryComponent::TryCombineItems(FName A, FName B)
 {
 	UAfterfallItemRegistry* Reg = GetOwner() ? GetOwner()->GetGameInstance()->GetSubsystem<UAfterfallItemRegistry>() : nullptr;

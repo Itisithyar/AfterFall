@@ -43,6 +43,7 @@
 #include "InputActionValue.h"
 #include "InputModifiers.h"
 #include "UI/AfterfallHUD.h"
+#include "UI/InventoryMatWidget.h"
 #include "Voxel/VoxelChunkActor.h"
 #include "Voxel/VoxelChunkTypes.h"
 #include "Misc/FileHelper.h"
@@ -1305,12 +1306,13 @@ void AAfterfallCharacter::ToggleInventory()
 	else
 	{
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))
-		{
-			PC->bShowMouseCursor = false;
-			PC->SetInputMode(FInputModeGameOnly());
+		{				PC->bShowMouseCursor = false;
+				PC->SetInputMode(FInputModeGameOnly());
+			}
 		}
+		// The mat widget follows the flag: open on Tab, close on Tab again.
+		ShowInventoryMat(bInventoryOpen);
 	}
-}
 
 void AAfterfallCharacter::OpenInventory()
 {
@@ -1325,6 +1327,47 @@ void AAfterfallCharacter::CloseInventory()
 	if (bInventoryOpen)
 	{
 		ToggleInventory();
+	}
+}
+
+bool AAfterfallCharacter::IsInventoryMatOpen() const
+{
+	return InventoryMatWidget && InventoryMatWidget->IsInViewport() && InventoryMatWidget->IsVisible();
+}
+
+void AAfterfallCharacter::ShowInventoryMat(bool bShow)
+{
+	if (!IsLocallyControlled())
+	{
+		return; // only the local pawn ever owns UI
+	}
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+	if (!InventoryMatWidget)
+	{
+		InventoryMatWidget = CreateWidget<UInventoryMatWidget>(PC, UInventoryMatWidget::StaticClass());
+	}
+	if (!InventoryMatWidget)
+	{
+		return;
+	}
+	// Re-bind every open: the component is fixed, but re-pushing the data
+	// guarantees the grid matches the inventory at the moment it appears.
+	InventoryMatWidget->SetInventory(AfterfallInventory);
+	if (bShow)
+	{
+		if (!InventoryMatWidget->IsInViewport())
+		{
+			InventoryMatWidget->AddToViewport(10);
+		}
+		InventoryMatWidget->SetVisibility(ESlateVisibility::Visible);
+	}
+	else
+	{
+		InventoryMatWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 

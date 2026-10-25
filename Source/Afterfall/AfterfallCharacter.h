@@ -233,6 +233,14 @@ public:
 	void OpenInventory();
 	void CloseInventory();
 	void OnInventoryPressed();
+	/** True while the local Tab inventory mat widget is on screen. */
+	bool IsInventoryMatOpen() const;
+	/** Show/hide the mat widget to match the open flag (local pawn only). */
+	void ShowInventoryMat(bool bShow);
+
+	/** UMG inventory mat (Tab). Local-only, created lazily on first open. */
+	UPROPERTY(Transient)
+	TObjectPtr<class UInventoryMatWidget> InventoryMatWidget;
 
 	// ---- Inventory UI actions (called from HUD, server-authoritative) ----
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Inventory")

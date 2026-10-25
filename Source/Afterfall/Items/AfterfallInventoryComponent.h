@@ -19,5 +19,7 @@ public:
 	bool RemoveItem(FName ID, int32 Qty);
 	bool HasItem(FName ID, int32 Qty) const;
 	bool TryCombineItems(FName A, FName B);
+	/** Exchange two slots in place (inventory mat click-to-swap) and notify. */
+	void SwapSlots(int32 IndexA, int32 IndexB);
 	TArray<FItemStack> GetAllStacks() const { return Slots; }
 };
