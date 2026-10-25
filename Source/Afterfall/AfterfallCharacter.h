@@ -22,6 +22,7 @@ class UInteractComponent;
 class UCarryComponent;
 class UAfterfallGrappleComponent;
 class UAdaptiveLimbComponent;
+class UAfterfallInventoryComponent;
 class URadialMenuComponent;
 class UMatInteractionComponent;
 class UAfterfallMovementComponent;
@@ -67,6 +68,7 @@ public:
 	// Server-authoritative wallet. Created as default subobject; replicated.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Inventory")
 	UInventoryComponent* Inventory;
+	UAfterfallInventoryComponent* AfterfallInventory = nullptr;
 
 	// Server-authoritative health. Death snakes to HandleDeath (auto-respawn).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Health")

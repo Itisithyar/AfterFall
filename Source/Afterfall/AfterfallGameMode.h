@@ -32,6 +32,7 @@ private:
 	 * untouched. Guarded so a server session can never spawn a second one.
 	 */
 	void SpawnAuthorizedTestBox();
+	void DeferredLightCheck();
 
 	bool bSpawnedTestBox = false;
 };

@@ -20,6 +20,7 @@
 #include "World/PhysicalItem.h"
 #include "Components/SceneComponent.h"
 #include "Movement/AfterfallMovementComponent.h"
+#include "Items/AfterfallInventoryComponent.h"
 #include "Storage/PhysicalMat.h"
 #include "AI/ZombiePrototype.h"
 #include "Camera/CameraComponent.h"
@@ -57,6 +58,7 @@ AAfterfallCharacter::AAfterfallCharacter(const FObjectInitializer& ObjectInitial
 {
 	bReplicates = true;
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+	AfterfallInventory = CreateDefaultSubobject<UAfterfallInventoryComponent>(TEXT("AfterfallInventory"));
 	Health = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
 	Injury = CreateDefaultSubobject<UInjuryStateComponent>(TEXT("Injury"));
 	Interact = CreateDefaultSubobject<UInteractComponent>(TEXT("Interact"));
