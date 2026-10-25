@@ -21,9 +21,22 @@ AAfterfallGameMode::AAfterfallGameMode()
 		RegionSeed, DefaultPawnClass ? *DefaultPawnClass->GetName() : TEXT("null"));
 }
 
+AActor* AAfterfallGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	Super::ChoosePlayerStart_Implementation(Player);
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It) return *It;
+	FHitResult Hit;
+	FVector Start = FVector(0,0,2000);
+	GetWorld()->LineTraceSingleByChannel(Hit, Start, FVector(0,0,-2000), ECC_Visibility);
+	FVector Loc = Hit.bBlockingHit ? Hit.ImpactPoint + FVector(0,0,10) : FVector(0,0,0);
+	FActorSpawnParameters P; P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	APlayerStart* PS = GetWorld()->SpawnActor<APlayerStart>(APlayerStart::StaticClass(), Loc, FRotator::ZeroRotator, P);
+	UE_LOG(LogAfterfall, Log, TEXT("created a PlayerStart at %s"), *Loc.ToString());
+	return PS;
+}
+
 void AAfterfallGameMode::BeginPlay()
 {
-	Super::BeginPlay();
 	SpawnAuthorizedTestBox();
 	GetWorldTimerManager().SetTimerForNextTick(this, &AAfterfallGameMode::DeferredLightCheck);
 	if (bSpawnTestTerrain)
