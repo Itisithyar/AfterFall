@@ -43,8 +43,36 @@ void AProceduralBuilding::BuildFloor(int32 FloorIndex)
 	}
 }
 
+FVector AProceduralBuilding::FragmentImpulseFor(const FVector& SectionCenter, const FVector& Epicenter,
+	float Strength, float FalloffRadius, float JitterFraction, FRandomStream& Stream)
+{
+	const FVector Offset = SectionCenter - Epicenter;
+	const float Dist = Offset.Size();
+	// Degenerate (section sits on the epicenter): blast straight up so it clears
+	// the rubble instead of receiving a zero impulse and staying put.
+	const FVector Direction = (Dist > KINDA_SMALL_NUMBER) ? Offset / Dist : FVector::UpVector;
+	const float Fall = (FalloffRadius > KINDA_SMALL_NUMBER)
+		? FMath::Clamp(1.f - Dist / FalloffRadius, 0.f, 1.f)
+		: 1.f;
+	const FVector Jitter(Stream.FRandRange(-1.f, 1.f),
+		Stream.FRandRange(-1.f, 1.f),
+		Stream.FRandRange(-0.5f, 1.f));
+	return Direction * (Strength * Fall) + Jitter * (Strength * FMath::Max(JitterFraction, 0.f));
+}
+
 void AProceduralBuilding::FragmentBuilding()
 {
+	if (bFragmented)
+	{
+		return; // already debris — do not re-kick settled pieces
+	}
+	bFragmented = true;
+
+	// Seeded stream: the same building always shatters the same way, so a
+	// replay of the blast is reproducible for tests and bug reports.
+	FRandomStream Stream(RandomSeed);
+	const FVector Epicenter = GetActorLocation();
+	int32 NumSections = 0;
 	TArray<UActorComponent*> Comps; GetComponents(Comps);
 	for (UActorComponent* C : Comps)
 	{
@@ -52,9 +80,17 @@ void AProceduralBuilding::FragmentBuilding()
 		{
 			PMC->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 			PMC->SetSimulatePhysics(true);
-			PMC->AddImpulse(FVector(FMath::FRandRange(-100.f,100.f), FMath::FRandRange(-100.f,100.f), FMath::FRandRange(0.f,200.f)), NAME_None, true);
+			const FVector SecWorld = PMC->GetComponentLocation();
+			const FVector Impulse = FragmentImpulseFor(SecWorld, Epicenter,
+				FragmentStrength, FragmentFalloffRadius, FragmentJitter, Stream);
+			// Velocity-change impulse applied at the section's own center: the piece
+			// both translates away from the blast and torques about its centroid.
+			PMC->AddImpulseAtLocation(Impulse, SecWorld, NAME_None);
+			++NumSections;
 		}
 	}
+	UE_LOG(LogAfterfall, Log, TEXT("FragmentBuilding: %d sections blasted from %s (strength %.0f, falloff %.0f)"),
+		NumSections, *Epicenter.ToString(), FragmentStrength, FragmentFalloffRadius);
 	// TODO: replace with Chaos fracture / chunk splitting
 }
 
