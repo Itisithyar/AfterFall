@@ -153,8 +153,9 @@ void UAfterfallMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
 		const bool bWant = bWantSprint && !bCarryingHeavy;
+		const float SprintDuration = Tuning.SprintDurationSec / (1.f + 0.2f * LoadRatio);
 		AdvanceSprint(SprintState, SprintTimeLeft, RecoveryTimeLeft, bWant,
-			Tuning.SprintDurationSec, Tuning.SprintRecoverySec, SimDelta);
+			SprintDuration, Tuning.SprintRecoverySec, SimDelta);
 	}
 
 	// Load ratio.
