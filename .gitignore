@@ -53,3 +53,13 @@ Content/**/*.bak/*
 /Afterfall 5.8/
 _*.txt
 _*.log
+
+# Generated/local-only working dirs — never committed (packages, caches,
+# backups, and the sibling animation tool project with its own .uproject).
+/AfterFallAnimation/
+/AfterfallStaging/
+/AfterfallStaging_*/
+/AfterfallSafetyBackups/
+/VaultCache/
+/.build_monitor/
+Scripts/__pycache__/

@@ -3,16 +3,22 @@
 // Slice: runtime input, interaction/combat RPCs, death + auto-respawn.
 #include "AfterfallCharacter.h"
 #include "Structural/StructuralActor.h"
+#include "Animation/AdaptiveLimbComponent.h"
 #include "Structural/ConstructionValidator.h"
 #include "Destruction/DestructionPropagation.h"
 #include "Inventory/InventoryComponent.h"
 #include "Combat/HealthComponent.h"
+#include "Combat/InjuryStateComponent.h"
+#include "Structural/BoxWallStructure.h"
 #include "Interaction/InteractComponent.h"
 #include "Interaction/CarryComponent.h"
 #include "UI/RadialMenuComponent.h"
 #include "Interaction/MatInteractionComponent.h"
 #include "Simulation/SimulationScheduler.h"
 #include "Interaction/Interactable.h"
+#include "Interaction/ClickArbitration.h"
+#include "World/PhysicalItem.h"
+#include "Components/SceneComponent.h"
 #include "Movement/AfterfallMovementComponent.h"
 #include "Storage/PhysicalMat.h"
 #include "AI/ZombiePrototype.h"
@@ -43,6 +49,7 @@
 #include "HAL/PlatformFileManager.h"
 #include "Afterfall.h"
 #include "Movement/AfterfallGrappleComponent.h"
+#include "Combat/ArticulatedBodyComponent.h"
 
 AAfterfallCharacter::AAfterfallCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UAfterfallMovementComponent>(
@@ -51,12 +58,17 @@ AAfterfallCharacter::AAfterfallCharacter(const FObjectInitializer& ObjectInitial
 	bReplicates = true;
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 	Health = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
+	Injury = CreateDefaultSubobject<UInjuryStateComponent>(TEXT("Injury"));
 	Interact = CreateDefaultSubobject<UInteractComponent>(TEXT("Interact"));
 	Carry = CreateDefaultSubobject<UCarryComponent>(TEXT("Carry"));
 	MatInteract = CreateDefaultSubobject<UMatInteractionComponent>(TEXT("MatInteract"));
 	RadialMenu = CreateDefaultSubobject<URadialMenuComponent>(TEXT("RadialMenu"));
 	Grapple = CreateDefaultSubobject<UAfterfallGrappleComponent>(TEXT("Grapple"));
+	RightArm = CreateDefaultSubobject<UAdaptiveLimbComponent>(TEXT("RightArm"));
 
+	WeaponHandPivot = CreateDefaultSubobject<USceneComponent>(TEXT("WeaponHandPivot"));
+	WeaponHandPivot->SetupAttachment(GetCapsuleComponent());
+	WeaponHandPivot->SetRelativeLocation(FVector(20.f, 30.f, -10.f));
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
 	FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
 	FirstPersonCamera->SetRelativeLocation(FVector(30.f, 0.f, 150.f));
@@ -89,6 +101,11 @@ void AAfterfallCharacter::BeginPlay()
 	if (HasAuthority() && Health)
 	{
 		Health->OnHealthDepleted.AddDynamic(this, &AAfterfallCharacter::HandleDeath);
+	}
+	if (Inventory)
+	{
+		Inventory->OnInventoryChanged.AddDynamic(this, &AAfterfallCharacter::OnInventoryChangedForLoad);
+		OnInventoryChangedForLoad();
 	}
 }
 
@@ -164,6 +181,9 @@ void AAfterfallCharacter::InjectSliceInput()
 		IA_Pause = MakeAction(this, TEXT("Slice_Pause"), EInputActionValueType::Boolean);
 		IA_Build = MakeAction(this, TEXT("Slice_Build"), EInputActionValueType::Boolean);
 		IA_Grapple = MakeAction(this, TEXT("Slice_Grapple"), EInputActionValueType::Boolean);
+		IA_Inventory = MakeAction(this, TEXT("Slice_Inventory"), EInputActionValueType::Boolean);
+		IA_Reach = MakeAction(this, TEXT("Slice_Reach"), EInputActionValueType::Boolean);
+		IA_GrabHold = MakeAction(this, TEXT("Slice_GrabHold"), EInputActionValueType::Boolean);
 		// W/S need the YX swizzle (keys inject X): W -> (0,+1), S -> (0,-1).
 		// A/D already land on X. MouseY likewise drives pitch via swizzle.
 		MapKey(SliceIMC, IA_Move, EKeys::W, false, false, true);
@@ -186,6 +206,12 @@ void AAfterfallCharacter::InjectSliceInput()
 		MapKey(SliceIMC, IA_Build, EKeys::V);
 		MapKey(SliceIMC, IA_Grapple, EKeys::T);
 		MapKey(SliceIMC, IA_Grapple, EKeys::Gamepad_DPad_Right);
+		MapKey(SliceIMC, IA_Inventory, EKeys::Tab);
+		MapKey(SliceIMC, IA_Inventory, EKeys::Gamepad_DPad_Left);
+		MapKey(SliceIMC, IA_GrabHold, EKeys::RightMouseButton);
+		MapKey(SliceIMC, IA_Reach, EKeys::LeftAlt);
+		MapKey(SliceIMC, IA_GrabHold, EKeys::Gamepad_LeftTrigger);
+		MapKey(SliceIMC, IA_Reach, EKeys::Gamepad_LeftShoulder);
 		// Binding table (keyboard, remappable; Move/Look stay fixed).
 		// Recipes preserve the swizzle/negate wiring across remaps.
 		BindingRecipes.Add(TEXT("Jump"), { false, false, false });
@@ -199,6 +225,7 @@ void AAfterfallCharacter::InjectSliceInput()
 		BindingRecipes.Add(TEXT("Fire"), { false, false, false });
 		BindingRecipes.Add(TEXT("Reload"), { false, false, false });
 		BindingRecipes.Add(TEXT("Pause"), { false, false, false });
+		BindingRecipes.Add(TEXT("GrabHold"), { false, false, false });
 		CurrentKeys.Add(TEXT("Jump"), EKeys::SpaceBar);
 		CurrentKeys.Add(TEXT("Sprint"), EKeys::LeftShift);
 		CurrentKeys.Add(TEXT("Interact"), EKeys::E);
@@ -210,6 +237,7 @@ void AAfterfallCharacter::InjectSliceInput()
 		CurrentKeys.Add(TEXT("Fire"), EKeys::F);
 		CurrentKeys.Add(TEXT("Reload"), EKeys::R);
 		CurrentKeys.Add(TEXT("Pause"), EKeys::Escape);
+		CurrentKeys.Add(TEXT("GrabHold"), EKeys::RightMouseButton);
 		LoadBindingOverrides();
 		// Gamepad parity: sticks are 1D keys, Y axes need the same swizzle.
 		// Stick-up is +Y, so no negate (unlike mouse, which is down-positive).
@@ -243,7 +271,11 @@ void AAfterfallCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		EIC->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AAfterfallCharacter::OnSprintStarted);
 		EIC->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AAfterfallCharacter::OnSprintReleased);
 		EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AAfterfallCharacter::OnInteractPressed);
+		EIC->BindAction(IA_Interact, ETriggerEvent::Completed, this, &AAfterfallCharacter::OnInteractReleased);
 		EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &AAfterfallCharacter::OnAttackPressed);
+		EIC->BindAction(IA_Attack, ETriggerEvent::Completed, this, &AAfterfallCharacter::OnAttackReleased);
+		EIC->BindAction(IA_GrabHold, ETriggerEvent::Started, this, &AAfterfallCharacter::OnGrabHoldPressed);
+		EIC->BindAction(IA_GrabHold, ETriggerEvent::Completed, this, &AAfterfallCharacter::OnGrabHoldReleased);
 		EIC->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AAfterfallCharacter::OnCrouchPressed);
 		EIC->BindAction(IA_Throw, ETriggerEvent::Started, this, &AAfterfallCharacter::OnThrowPressed);
 		EIC->BindAction(IA_Drop, ETriggerEvent::Started, this, &AAfterfallCharacter::OnDropPressed);
@@ -253,6 +285,9 @@ void AAfterfallCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		EIC->BindAction(IA_Pause, ETriggerEvent::Started, this, &AAfterfallCharacter::OnPausePressed);
 		EIC->BindAction(IA_Build, ETriggerEvent::Started, this, &AAfterfallCharacter::OnBuildPressed);
 		EIC->BindAction(IA_Grapple, ETriggerEvent::Started, this, &AAfterfallCharacter::OnGrapplePressed);
+		EIC->BindAction(IA_Inventory, ETriggerEvent::Started, this, &AAfterfallCharacter::OnInventoryPressed);
+		EIC->BindAction(IA_Reach, ETriggerEvent::Started, this, &AAfterfallCharacter::OnReachPressed);
+		EIC->BindAction(IA_Reach, ETriggerEvent::Completed, this, &AAfterfallCharacter::OnReachReleased);
 	}
 }
 
@@ -270,9 +305,9 @@ void AAfterfallCharacter::Jump()
 	Super::Jump();
 }void AAfterfallCharacter::Move(const FInputActionValue& Value)
 {
-	if (IsMatInventoryOpen())
+	if (IsMatInventoryOpen() || bInventoryOpen)
 	{
-		return; // server sees no input and halts the pawn; no movement-code change
+		return; // inventory open: no movement input
 	}
 	// Gamepad menu navigation: stick-Y cycles the highlighted button.
 	// (Kept for the unpaused path; while paused the HUD tick polls the
@@ -304,9 +339,29 @@ void AAfterfallCharacter::Jump()
 
 void AAfterfallCharacter::Look(const FInputActionValue& Value)
 {
-	if (IsMatInventoryOpen() || IsQuickMenuOpen())
+	if (bWeaponRotating)
 	{
-		return; // menu open: mouse drives the cursor, never the camera
+		// Double-click rotation active: the mouse drives the weapon hand,
+		// not the camera, until the button is released.
+		const FVector2D V = Value.Get<FVector2D>();
+		RotateWeaponHand(V);
+		return;
+	}
+	if (IsMatInventoryOpen() || IsQuickMenuOpen() || bInventoryOpen)
+	{
+		return; // menu/inventory open: mouse drives the cursor, never the camera
+	}
+	if (IsRadialMenuOpen())
+	{
+		// Wheel open: the camera stays fixed on the crosshair. Look
+		// displacement becomes wheel selection instead. Mouse and gamepad
+		// stick share this path, so selection is never mouse-only.
+		if (RadialMenu)
+		{
+			RadialDragAccum += Value.Get<FVector2D>();
+			RadialMenu->UpdateDragFromHold(RadialDragAccum);
+		}
+		return;
 	}
 	const FVector2D V = Value.Get<FVector2D>();
 	AddControllerYawInput(V.X);
@@ -401,7 +456,7 @@ void AAfterfallCharacter::OnBuildPressed()
 
 void AAfterfallCharacter::OnFirePressed()
 {
-	if (!IsLocallyControlled() || IsQuickMenuOpen())
+	if (!IsLocallyControlled() || IsQuickMenuOpen() || IsRadialMenuOpen())
 	{
 		return; // menu eats fire input: no weapon discharge through the UI
 	}
@@ -416,7 +471,7 @@ void AAfterfallCharacter::OnFirePressed()
 
 void AAfterfallCharacter::OnReloadPressed()
 {
-	if (IsLocallyControlled() && !IsQuickMenuOpen())
+	if (IsLocallyControlled() && !IsQuickMenuOpen() && !IsRadialMenuOpen())
 	{
 		ServerReload();
 	}
@@ -495,6 +550,65 @@ void AAfterfallCharacter::ServerFireHitscan_Implementation(const FVector& Direct
 	}
 }
 
+bool AAfterfallCharacter::ServerSelfTreatBandage_Validate()
+{
+	return true;
+}
+
+void AAfterfallCharacter::ServerSelfTreatBandage_Implementation()
+{
+	if (!HasAuthority() || !Injury)
+	{
+		return;
+	}
+	if (Health && Health->bIsDead)
+	{
+		return; // no treating while dead
+	}
+	// Priority rule: first actively-bleeding part, else first wounded part.
+	int32 BleedingIdx = -1;
+	int32 FirstWoundedIdx = -1;
+	for (int32 i = 0; i < Injury->PartInjuries.Num(); ++i)
+	{
+		const FInjuryRecord& R = Injury->PartInjuries[i];
+		if (!R.bWounded)
+		{
+			continue;
+		}
+		if (R.bBleeding)
+		{
+			BleedingIdx = i;
+			break; // deterministic: first bleeding part wins
+		}
+		if (FirstWoundedIdx < 0)
+		{
+			FirstWoundedIdx = i;
+		}
+	}
+	const int32 ChosenIdx = BleedingIdx >= 0 ? BleedingIdx : FirstWoundedIdx;
+	if (ChosenIdx < 0)
+	{
+		return; // nothing to treat; single no-op request, nothing consumed
+	}
+	static const FName BandageId = TEXT("AF_MED_Bandage");
+	Injury->ServerBeginTreatment(static_cast<EBodyPart>(ChosenIdx), BandageId);
+	// Item is consumed exactly once at successful completion by the
+	// InjuryState/MedicalCapability pipeline (server-atomic).
+}
+
+bool AAfterfallCharacter::ServerInterruptSelfTreatment_Validate()
+{
+	return true;
+}
+
+void AAfterfallCharacter::ServerInterruptSelfTreatment_Implementation()
+{
+	if (HasAuthority() && Injury)
+	{
+		Injury->ServerInterruptTreatment();
+	}
+}
+
 bool AAfterfallCharacter::ServerThrowHeld_Validate(const FVector& Direction)
 {
 	return !Direction.IsNearlyZero() && Direction.SizeSquared() < 4.f;
@@ -548,6 +662,11 @@ void AAfterfallCharacter::ServerDeployMat_Implementation()
 
 void AAfterfallCharacter::OnInteractPressed()
 {
+	if (IsLocallyControlled())
+	{
+		// E is the self-treatment modifier: held E + LMB treats a wound.
+		bEKeyHeld = true;
+	}
 	if (IsQuickMenuOpen())
 	{
 		// Gamepad menu confirm: activate the highlighted button.
@@ -565,6 +684,21 @@ void AAfterfallCharacter::OnInteractPressed()
 	{
 		ServerInteractRequest(Interact->FocusedActor.Get());
 	}
+}
+
+void AAfterfallCharacter::OnInteractReleased()
+{
+	bEKeyHeld = false;
+	// Hold-to-treat: releasing E aborts an in-progress bandage application.
+	if (Injury && Injury->TreatmentState == ETreatmentState::Treating)
+	{
+		ServerInterruptSelfTreatment();
+	}
+}
+
+bool AAfterfallCharacter::IsRadialMenuOpen() const
+{
+	return RadialMenu && RadialMenu->bIsMenuOpen;
 }
 
 void AAfterfallCharacter::OnAttackPressed()
@@ -586,10 +720,352 @@ void AAfterfallCharacter::OnAttackPressed()
 		}
 		return;
 	}
+	if (IsMatInventoryOpen() || !RadialMenu)
+	{
+		// Mat open (or no wheel): preserve the legacy immediate path.
+		DefaultLMBAction();
+		return;
+	}
+	// Mouse-1 press: start the 330 ms wheel hold. A press that completes a
+	// double click instead claims the gesture for weapon-hand rotation, so
+	// neither rotation nor the wheel can also produce an attack.
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (bPendingClick && AFClick::IsDoubleClick(Now, LMBReleaseSec,
+		(double)DoubleClickWindowSec, (double)ClickResolveDelaySec))
+	{
+		// Second click: swallow the pending first click (it never attacks)
+		// and rotate while this press is held. No wheel on the second press.
+		bPendingClick = false;
+		GetWorldTimerManager().ClearTimer(ClickResolveTimer);
+		bWeaponRotating = true;
+		bLMBHeld = true;
+		LMBHoldStartSec = Now;
+		GetWorldTimerManager().ClearTimer(RadialOpenTimer);
+		return;
+	}
+	bLMBHeld = true;
+	LMBHoldStartSec = Now;
+	LMBHoldTarget = Interact ? Interact->FocusedActor.Get() : nullptr;
+	RadialDragAccum = FVector2D::ZeroVector;
+	GetWorldTimerManager().ClearTimer(RadialOpenTimer);
+	GetWorldTimerManager().SetTimer(RadialOpenTimer, this,
+		&AAfterfallCharacter::OpenRadialFromHold, RadialMenu->HoldThresholdSec, false);
+}
+
+void AAfterfallCharacter::OnAttackReleased()
+{
+	if (!IsLocallyControlled() || !bLMBHeld)
+	{
+		return;
+	}
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const double Held = Now - LMBHoldStartSec;
+	bLMBHeld = false;
+	GetWorldTimerManager().ClearTimer(RadialOpenTimer);
+	if (IsRadialMenuOpen())
+	{
+		// Hold converted the input into a wheel action: confirm the choice
+		// and never fall through to an attack.
+		ConfirmRadialFromHold();
+		return;
+	}
+	if (bWeaponRotating)
+	{
+		// Exit action for rotation: the hand returns to rest.
+		bWeaponRotating = false;
+		if (WeaponHandPivot)
+		{
+			WeaponHandPivot->SetRelativeRotation(FRotator::ZeroRotator);
+		}
+		return;
+	}
+	if (!AFClick::ReleaseIsClick(Held, (double)RadialMenu->HoldThresholdSec, false))
+	{
+		return; // held past 330 ms with no options: nothing to fire
+	}
+	// Click: defer the attack behind the resolve delay so a second click
+	// inside the double-click window can claim the gesture instead.
+	bPendingClick = true;
+	LMBReleaseSec = Now;
+	GetWorldTimerManager().ClearTimer(ClickResolveTimer);
+	GetWorldTimerManager().SetTimer(ClickResolveTimer, this,
+		&AAfterfallCharacter::ResolveSingleClick, ClickResolveDelaySec, false);
+}
+
+void AAfterfallCharacter::DefaultLMBAction()
+{
 	if (!IsMatInventoryOpen())
 	{
+		// Bandage self-treatment dispatch: hold E + LMB treats an active wound
+		// instead of a melee swing. Without E held the melee path is unchanged.
+		bool bAnyWound = false;
+		if (Injury)
+		{
+			for (const FInjuryRecord& R : Injury->PartInjuries)
+			{
+				if (R.bWounded) { bAnyWound = true; break; }
+			}
+		}
+		if (bEKeyHeld && bAnyWound)
+		{
+			ServerSelfTreatBandage();
+			return;
+		}
 		ServerAttack();
 	}
+}
+
+void AAfterfallCharacter::ResolveSingleClick()
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	if (!AFClick::ResolvesToAttack(bPendingClick, IsRadialMenuOpen(), bWeaponRotating))
+	{
+		bPendingClick = false;
+		return;
+	}
+	bPendingClick = false;
+	LMBReleaseSec = 0.0;
+	DefaultLMBAction(); // the swing: same gate as before the arbitration
+}
+
+void AAfterfallCharacter::RotateWeaponHand(const FVector2D& MouseDelta)
+{
+	if (!WeaponHandPivot)
+	{
+		return;
+	}
+	FRotator R = WeaponHandPivot->GetRelativeRotation();
+	R.Yaw += MouseDelta.X * WeaponRotationSpeedDeg;
+	R.Pitch = FMath::Clamp(R.Pitch - MouseDelta.Y * WeaponRotationSpeedDeg,
+		-WeaponPitchClampDeg, WeaponPitchClampDeg);
+	WeaponHandPivot->SetRelativeRotation(R);
+}
+
+void AAfterfallCharacter::FireGrabHold()
+{
+	if (!IsLocallyControlled() || bGrabHoldFired)
+	{
+		return;
+	}
+	AActor* Target = GrabHoldTarget.Get();
+	if (!Target || Target->IsPendingKillPending())
+	{
+		UE_LOG(LogAfterfall, Log, TEXT("GRAB rejected: target gone before the 230ms hold"));
+		return;
+	}
+	// One entry point for every grabbable thing; the server re-validates
+	// range/facing/state and rejects unsupported classes cleanly.
+	bGrabHoldFired = true;
+	ServerRequestBodyGrab(Target, true);
+}
+
+void AAfterfallCharacter::OpenRadialFromHold()
+{
+	if (!bLMBHeld || !IsLocallyControlled() || IsQuickMenuOpen() || IsMatInventoryOpen() || !RadialMenu)
+	{
+		return;
+	}
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (!URadialMenuComponent::ShouldOpenMenu(Now - LMBHoldStartSec, (double)RadialMenu->HoldThresholdSec))
+	{
+		return;
+	}
+	// Re-resolve the target at open time: aim may have drifted during the hold.
+	LMBHoldTarget = Interact ? Interact->FocusedActor.Get() : nullptr;
+	TArray<FRadialMenuOption> Opts = RadialMenu->BuildContextualOptions();
+	if (Opts.Num() == 0)
+	{
+		return; // nothing useful: release falls through to the default action
+	}
+	RadialMenu->OpenAtCrosshair(Opts);
+}
+
+void AAfterfallCharacter::ConfirmRadialFromHold()
+{
+	if (!RadialMenu || !RadialMenu->bIsMenuOpen)
+	{
+		return;
+	}
+	const ERadialAction Action = RadialMenu->GetSelectedAction();
+	AActor* Target = LMBHoldTarget.Get();
+	RadialMenu->Cancel();
+	LMBHoldTarget = nullptr;
+	RadialDragAccum = FVector2D::ZeroVector;
+	if (Action == ERadialAction::Cancel)
+	{
+		return;
+	}
+	// Target loss: drop target-bound choices, never retarget silently.
+	// The server re-validates range/facing/state before executing anyway.
+	const bool bNeedsTarget = Action != ERadialAction::Treat
+		&& Action != ERadialAction::Throw
+		&& Action != ERadialAction::Drop
+		&& Action != ERadialAction::Cancel;
+	if (bNeedsTarget)
+	{
+		if (!Target || Target->IsPendingKillPending())
+		{
+			return;
+		}
+		if (Interact && Interact->FocusedActor.IsValid() && Interact->FocusedActor.Get() != Target)
+		{
+			return; // aim moved to something else mid-hold: no silent retarget
+		}
+	}
+	ExecuteRadialAction(Action, Target);
+}
+
+void AAfterfallCharacter::CancelRadialMenu()
+{
+	bLMBHeld = false;
+	bPendingClick = false;
+	bWeaponRotating = false;
+	GetWorldTimerManager().ClearTimer(ClickResolveTimer);
+	if (WeaponHandPivot)
+	{
+		WeaponHandPivot->SetRelativeRotation(FRotator::ZeroRotator);
+	}
+	LMBHoldTarget = nullptr;
+	RadialDragAccum = FVector2D::ZeroVector;
+	GetWorldTimerManager().ClearTimer(RadialOpenTimer);
+	if (RadialMenu)
+	{
+		RadialMenu->Cancel();
+	}
+}
+
+void AAfterfallCharacter::ExecuteRadialAction(ERadialAction Action, AActor* Target)
+{
+	switch (Action)
+	{
+	case ERadialAction::Inspect:
+		// Display-only: surface the prompt, never touch state.
+		if (Target && Target->Implements<UInteractable>())
+		{
+			LastInspectText = IInteractable::Execute_GetInteractPrompt(Target);
+		}
+		else if (Target)
+		{
+			LastInspectText = FText::FromString(Target->GetName());
+		}
+		else
+		{
+			LastInspectText = FText::GetEmpty();
+		}
+		break;
+	case ERadialAction::Grab:
+	case ERadialAction::Drag:
+		// Same physics-handle constraint as the E-channel grab; the server
+		// validates ragdoll state, so Drag cannot move a living zombie.
+		if (Target)
+		{
+			ServerRequestBodyGrab(Target, true);
+		}
+		break;
+	case ERadialAction::Release:
+		if (Target)
+		{
+			ServerRequestBodyGrab(Target, false);
+		}
+		break;
+	case ERadialAction::Use:
+	case ERadialAction::PickUp:
+		// One shared entry for usable objects: the item's own
+		// IInteractable::ServerInteract runs the validated transaction.
+		if (Target)
+		{
+			ServerInteractRequest(Target);
+		}
+		break;
+	case ERadialAction::Throw:
+		if (Carry && Carry->bIsCarrying)
+		{
+			if (AController* PC = GetController())
+			{
+				FVector CamLoc;
+				FRotator CamRot;
+				PC->GetPlayerViewPoint(CamLoc, CamRot);
+				ServerThrowHeld(CamRot.Vector());
+			}
+		}
+		break;
+	case ERadialAction::Drop:
+		ServerDropHeld();
+		break;
+	case ERadialAction::Treat:
+		// Canonical treatment pipeline: priority part + bandage item,
+		// validated and consumed server-side. Same as the E+LMB path.
+		ServerSelfTreatBandage();
+		break;
+	case ERadialAction::Access:
+		if (MatInteract)
+		{
+			MatInteract->ServerRequestMatOpen();
+		}
+		break;
+	case ERadialAction::PackUp:
+		if (MatInteract)
+		{
+			MatInteract->ServerRequestMatClose();
+		}
+		break;
+	case ERadialAction::Craft:
+		// Wheel only offers Craft on a storage mat (the station context); the
+		// server re-validates target + range before touching the inventory.
+		if (Target)
+		{
+			ServerCraftCombine(Target, FGuid::NewGuid());
+		}
+		break;
+	default:
+		break; // legacy/no-op actions never execute state
+	}
+}
+
+void AAfterfallCharacter::OnGrabHoldPressed()
+{
+	if (!IsLocallyControlled() || IsQuickMenuOpen() || IsMatInventoryOpen())
+	{
+		return;
+	}
+	if (IsRadialMenuOpen())
+	{
+		// RMB is the wheel's cancel chord: never start a grab through the menu.
+		CancelRadialMenu();
+		return;
+	}
+	// Hold 230 ms (elapsed time) before committing: a tap never grabs.
+	// The target is captured at press and re-validated by the server at commit.
+	GrabHoldTarget = Interact ? Interact->FocusedActor.Get() : nullptr;
+	bGrabHoldFired = false;
+	GetWorldTimerManager().ClearTimer(GrabHoldTimer);
+	if (GrabHoldTarget.IsValid())
+	{
+		GetWorldTimerManager().SetTimer(GrabHoldTimer, this,
+			&AAfterfallCharacter::FireGrabHold, GrabHoldSec, false);
+	}
+}
+
+void AAfterfallCharacter::OnGrabHoldReleased()
+{
+	GetWorldTimerManager().ClearTimer(GrabHoldTimer);
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	// A tap that never reached 230 ms releases nothing (clean no-op).
+	// A committed body grab detaches with its momentum preserved; a carried
+	// item stays held (Q/G own drop/throw), so letting go never launches it.
+	AActor* Target = GrabHoldTarget.Get();
+	if (bGrabHoldFired && Target)
+	{
+		ServerRequestBodyGrab(Target, false);
+	}
+	bGrabHoldFired = false;
+	GrabHoldTarget = nullptr;
 }
 
 void AAfterfallCharacter::OnCrouchPressed()
@@ -608,10 +1084,25 @@ void AAfterfallCharacter::OnCrouchPressed()
 	}
 }
 
+void AAfterfallCharacter::OnInventoryChangedForLoad()
+{
+	if (!Inventory) return;
+	UAfterfallMovementComponent* Move = GetAfterfallMovement();
+	if (Move)
+	{
+		Move->SetCarriedMass(Inventory->GetWeightKg());
+	}
+}
 void AAfterfallCharacter::OnPausePressed()
 {
 	if (!IsLocallyControlled())
 	{
+		return;
+	}
+	if (IsRadialMenuOpen())
+	{
+		// Esc cancels the wheel; the pause menu stays untouched.
+		CancelRadialMenu();
 		return;
 	}
 	ToggleQuickMenu();
@@ -664,6 +1155,174 @@ void AAfterfallCharacter::CloseQuickMenu()
 	{
 		ToggleQuickMenu();
 	}
+}
+
+void AAfterfallCharacter::OnInventoryPressed()
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	ToggleInventory();
+}
+
+void AAfterfallCharacter::ToggleInventory()
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	if (IsRadialMenuOpen())
+	{
+		// Inventory takes cursor ownership; the wheel must not fight it.
+		CancelRadialMenu();
+	}
+	bInventoryOpen = !bInventoryOpen;
+	if (bInventoryOpen)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			PC->bShowMouseCursor = true;
+			PC->SetInputMode(FInputModeGameAndUI());
+		}
+	}
+	else
+	{
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			PC->bShowMouseCursor = false;
+			PC->SetInputMode(FInputModeGameOnly());
+		}
+	}
+}
+
+void AAfterfallCharacter::OpenInventory()
+{
+	if (!bInventoryOpen)
+	{
+		ToggleInventory();
+	}
+}
+
+void AAfterfallCharacter::CloseInventory()
+{
+	if (bInventoryOpen)
+	{
+		ToggleInventory();
+	}
+}
+
+// ---------------------------------------------------------------- Inventory UI Actions ---
+
+bool AAfterfallCharacter::ServerUseInventorySlot_Validate(int32 SlotIndex)
+{
+	return SlotIndex >= 0 && Inventory != nullptr;
+}
+
+void AAfterfallCharacter::ServerUseInventorySlot_Implementation(int32 SlotIndex)
+{
+	if (!HasAuthority() || !Inventory)
+	{
+		return;
+	}
+	if (SlotIndex < 0 || SlotIndex >= Inventory->Slots.Num())
+	{
+		return;
+	}
+	Inventory->ServerUseItem(Inventory->Slots[SlotIndex].Item.InstanceId);
+}
+
+bool AAfterfallCharacter::ServerDropInventorySlot_Validate(int32 SlotIndex, int32 Count)
+{
+	return SlotIndex >= 0 && Count > 0 && Inventory != nullptr;
+}
+
+void AAfterfallCharacter::ServerDropInventorySlot_Implementation(int32 SlotIndex, int32 Count)
+{
+	if (!HasAuthority() || !Inventory)
+	{
+		return;
+	}
+	if (SlotIndex < 0 || SlotIndex >= Inventory->Slots.Num())
+	{
+		return;
+	}
+	Inventory->ServerDropItem(Inventory->Slots[SlotIndex].Item.InstanceId, Count);
+}
+
+bool AAfterfallCharacter::ServerEquipInventorySlot_Validate(int32 SlotIndex)
+{
+	return SlotIndex >= 0 && Inventory != nullptr;
+}
+
+void AAfterfallCharacter::ServerEquipInventorySlot_Implementation(int32 SlotIndex)
+{
+	if (!HasAuthority() || !Inventory)
+	{
+		return;
+	}
+	if (SlotIndex < 0 || SlotIndex >= Inventory->Slots.Num())
+	{
+		return;
+	}
+	Inventory->ServerEquipItem(Inventory->Slots[SlotIndex].Item.InstanceId);
+}
+
+bool AAfterfallCharacter::ServerUnequipInventorySlotByName_Validate(FName SlotName)
+{
+	return !SlotName.IsNone();
+}
+
+void AAfterfallCharacter::ServerUnequipInventorySlotByName_Implementation(FName SlotName)
+{
+	if (!HasAuthority() || !Inventory)
+	{
+		return;
+	}
+	Inventory->ServerUnequipItem(SlotName);
+}
+
+void AAfterfallCharacter::OnReachPressed()
+{
+	if (!IsLocallyControlled() || IsQuickMenuOpen() || IsMatInventoryOpen() || bInventoryOpen)
+	{
+		return;
+	}
+	SetReachTargetFromCamera();
+	if (RightArm)
+	{
+		RightArm->AcquireContact();
+	}
+}
+
+void AAfterfallCharacter::OnReachReleased()
+{
+	if (RightArm)
+	{
+		RightArm->ReleaseContact();
+	}
+}
+
+void AAfterfallCharacter::SetReachTargetFromCamera()
+{
+	if (!FirstPersonCamera || !RightArm)
+	{
+		return;
+	}
+	FVector CamLoc = FirstPersonCamera->GetComponentLocation();
+	FVector CamFwd = FirstPersonCamera->GetForwardVector();
+	FVector Target = CamLoc + CamFwd * RightArm->Config.MaxReachCm;
+	RightArm->SetReachTarget(Target);
+}
+
+bool AAfterfallCharacter::IsRightArmReaching() const
+{
+	return RightArm && (RightArm->GetLimbTarget().DesiredDistanceCm > 0.f);
+}
+
+FAdaptiveLimbPose AAfterfallCharacter::GetRightArmPose() const
+{
+	return RightArm ? RightArm->GetLimbPose() : FAdaptiveLimbPose();
 }
 
 bool AAfterfallCharacter::HealthIsDead() const
@@ -786,6 +1445,7 @@ bool AAfterfallCharacter::RemapAction(FName ActionName, const FKey& NewKey)
 	else if (ActionName == FName(TEXT("Fire"))) Slot = &IA_Fire;
 	else if (ActionName == FName(TEXT("Reload"))) Slot = &IA_Reload;
 	else if (ActionName == FName(TEXT("Pause"))) Slot = &IA_Pause;
+	else if (ActionName == FName(TEXT("GrabHold"))) Slot = &IA_GrabHold;
 	if (!Slot || !*Slot || !SliceIMC)
 	{
 		return false;
@@ -820,7 +1480,7 @@ void AAfterfallCharacter::RestoreDefaultBindings()
 		{ FName(TEXT("Crouch")), EKeys::C }, { FName(TEXT("Throw")), EKeys::Q },
 		{ FName(TEXT("Drop")), EKeys::G }, { FName(TEXT("Mat")), EKeys::B },
 		{ FName(TEXT("Fire")), EKeys::F }, { FName(TEXT("Reload")), EKeys::R },
-		{ FName(TEXT("Pause")), EKeys::Escape }
+		{ FName(TEXT("Pause")), EKeys::Escape }, { FName(TEXT("GrabHold")), EKeys::RightMouseButton }
 	};
 	for (const TPair<FName, FKey>& D : Defaults)
 	{
@@ -836,6 +1496,7 @@ void AAfterfallCharacter::RestoreDefaultBindings()
 		else if (D.Key == FName(TEXT("Fire"))) Slot = &IA_Fire;
 		else if (D.Key == FName(TEXT("Reload"))) Slot = &IA_Reload;
 		else if (D.Key == FName(TEXT("Pause"))) Slot = &IA_Pause;
+		else if (D.Key == FName(TEXT("GrabHold"))) Slot = &IA_GrabHold;
 		if (!Slot || !*Slot || !SliceIMC)
 		{
 		continue;
@@ -953,6 +1614,97 @@ void AAfterfallCharacter::ServerInteractRequest_Implementation(AActor* Target)
 	IInteractable::Execute_ServerInteract(Target, GetController());
 }
 
+bool AAfterfallCharacter::ServerRequestBodyGrab_Validate(AActor* Target, bool bGrab)
+{
+	return Target != nullptr;
+}
+
+void AAfterfallCharacter::ServerRequestBodyGrab_Implementation(AActor* Target, bool bGrab)
+{
+	if (!HasAuthority() || !Target || (Health && Health->bIsDead) || !Interact)
+	{
+		return;
+	}
+	// ONE validation for every grabbable class: range, facing, target state.
+	if (!Interact->ServerValidateTarget(GetController(), Target))
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("GRAB rejected: validation failed for %s"),
+			*Target->GetName());
+		return;
+	}
+	// Objects (items): the carry slot's own validated pickup. RMB release
+	// deliberately does NOT drop it - Q/G own drop/throw, so releasing the
+	// button can never launch a held item.
+	if (APhysicalItem* Item = Cast<APhysicalItem>(Target))
+	{
+		if (bGrab && Carry)
+		{
+			Carry->ServerPickup(Item);
+		}
+		return;
+	}
+	// Bodies: the ArticulatedBody owns the constraint (physics handle on the
+	// ragdoll torso; release preserves momentum). ServerGrab refuses a
+	// non-ragdoll body, so a living zombie can never be puppeted. Attack
+	// state is untouched: LMB swings neither cancel nor disturb a hold.
+	AZombiePrototype* Z = Cast<AZombiePrototype>(Target);
+	if (!Z || !Z->Body)
+	{
+		UE_LOG(LogAfterfall, Warning,
+			TEXT("GRAB rejected: unsupported target %s (bodies and items only)"),
+			*Target->GetName());
+		return;
+	}
+	if (bGrab)
+	{
+		if (Z->Body->IsRagdoll() && !Z->Body->IsGrabbed())
+		{
+			Z->Body->ServerGrab(GetController());
+		}
+		else if (!Z->Body->IsRagdoll())
+		{
+			UE_LOG(LogAfterfall, Warning, TEXT("GRAB rejected: %s is not a grabbable body"),
+				*Target->GetName());
+		}
+	}
+	else if (Z->Body->IsGrabbed())
+	{
+		Z->Body->ServerRelease();
+	}
+}
+
+bool AAfterfallCharacter::ServerCraftCombine_Validate(AActor* Target, FGuid TransactionId)
+{
+	return Target != nullptr && TransactionId.IsValid();
+}
+
+void AAfterfallCharacter::ServerCraftCombine_Implementation(AActor* Target, FGuid TransactionId)
+{
+	if (!HasAuthority() || !Inventory || !Interact || !Target)
+	{
+		return;
+	}
+	// Context gate: the wheel only offers Craft on a storage mat, so the
+	// server demands the same station context — a client cannot turn this
+	// into a context-free craft-anywhere request.
+	if (!Target->IsA<APhysicalStorageMat>())
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("Craft rejected: not a crafting station"));
+		return;
+	}
+	// Same range + facing gate as every other interaction: no reach exploits.
+	if (!Interact->ServerValidateTarget(GetController(), Target))
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("Craft rejected: validation failed"));
+		return;
+	}
+	FString Error;
+	if (!Inventory->ServerCombineFirstAvailable(TransactionId, Error))
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("Craft rejected: %s"), *Error);
+	}
+}
+
 void AAfterfallCharacter::OnGrapplePressed()
 {
 	// Toggle through the server: attach when idle, release when attached.
@@ -1026,6 +1778,19 @@ void AAfterfallCharacter::ServerAttack_Implementation()
 		EBodyPart Part = EBodyPart::Torso;
 		AZombiePrototype::PartFromComponent(Hit.GetComponent(), Part);
 		Z->ServerHitPart(Part, PC);
+		ConfirmedHits++;
+	}
+	else if (ABoxWallStructure* W = Cast<ABoxWallStructure>(Hit.GetActor()))
+	{
+		// FR-013: graybox melee strike into the box wall. The wall's ledger
+		// recomputes from its own authoritative state; GUID-deduped like the
+		// StructuralActor path. Energy: graybox strike (m+v below) matches
+		// the punch plan (strong hit ~300 J -> breaches drywall/wood).
+		FBoxImpactInput Swing;
+		Swing.EffectiveMassKg = 30.f;
+		Swing.RelativeSpeedCmS = 450.f;
+		W->ServerApplyBoxImpact(Hit.ImpactPoint, CamRot.Vector(), Swing,
+			FGuid::NewGuid());
 		ConfirmedHits++;
 	}
 	else if (AStructuralActor* S = Cast<AStructuralActor>(Hit.GetActor()))

@@ -20,6 +20,8 @@ struct FCraftRecipe
 {
 	GENERATED_BODY()
 	UPROPERTY() FName RecipeId;
+	/** Rule version recorded on crafted children for provenance/migration. */
+	UPROPERTY() int32 RecipeVersion = 1;
 	UPROPERTY() FName OutputItem;
 	UPROPERTY() int32 OutputCount = 1;
 	UPROPERTY() TArray<FCraftIngredient> Inputs;

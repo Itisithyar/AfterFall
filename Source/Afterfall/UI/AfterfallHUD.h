@@ -39,11 +39,23 @@ private:
 	bool bWasMenuOpen = false;
 	double MenuCloseAnimEnd = 0.0;
 
+	// ---- Inventory UI state (local only, never replicated) ----
+	int32 InventorySelectedCategory = 0; // 0=All, 1..N = EItemCategory index
+	int32 InventorySelectedSlot = -1;
+	int32 InventoryHoveredSlot = -1;
+	double InventoryLastNavTime = 0.0;
+
 	class AAfterfallCharacter* MenuPawn() const;
+	/** Crosshair-anchored radial wheel. Reads local RadialMenu state only
+	 *  (options, selection, radius); never touches gameplay state. */
+	void DrawRadialWheel(class AAfterfallCharacter* Pawn, UFont* Font, float VS);
 	void DrawQuickMenu(class AAfterfallCharacter* Pawn, UFont* Font, float VS, double Now);
 	void DrawMapPage(const FBox2D& Inner, UFont* Font, float VS);
 	void DrawControlsPage(class AAfterfallCharacter* Pawn, const FBox2D& Inner, UFont* Font, float VS);
 	void DrawLabPage(const FBox2D& Inner, UFont* Font, float VS);
+	void DrawInventory(class AAfterfallCharacter* Pawn, UFont* Font, float VS);
+	bool HandleInventoryInput(class AAfterfallCharacter* Pawn);
+	void InventoryNavigate(int32 DeltaX, int32 DeltaY);
 	void DrawMenuButton(int32 Index, const FMenuButton& B, int32 Selected, UFont* Font, float VS, float Alpha);
 	void PollCaptureKey(class AAfterfallCharacter* Pawn);
 };

@@ -39,6 +39,15 @@ void UHealthComponent::ServerRevive()
 	bIsDead = false;
 }
 
+void UHealthComponent::ServerHeal(float Amount)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bIsDead)
+	{
+		return;
+	}
+	HP = FMath::Clamp(HP + Amount, 0.f, MaxHP);
+}
+
 void UHealthComponent::OnRep_HP() {}
 
 void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

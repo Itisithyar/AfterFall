@@ -6,6 +6,8 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Combat/HealthComponent.h"
+#include "Combat/InjuryStateComponent.h"
+#include "Combat/ArticulatedBodyComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -39,6 +41,10 @@ AZombiePrototype::AZombiePrototype()
 		FVector(0.f, -16.f, 45.f), FVector(0.15f, 0.15f, 0.9f), TEXT("BodyPart.LegL"));
 	PartLegR = BuildPart(TEXT("LegR"), TEXT("/Engine/BasicShapes/Cylinder.Cylinder"),
 		FVector(0.f, 16.f, 45.f), FVector(0.15f, 0.15f, 0.9f), TEXT("BodyPart.LegR"));
+
+	Body = CreateDefaultSubobject<UArticulatedBodyComponent>(TEXT("ArticulatedBody"));
+	Body->BindParts(GetCapsuleComponent(), PartTorso,
+		{ PartHead, PartTorso, PartArmL, PartArmR, PartLegL, PartLegR });
 }
 
 void AZombiePrototype::InitializeDefaultConfigs()
@@ -274,6 +280,8 @@ void AZombiePrototype::AITick()
 		if (VictimDistM <= AttackRangeM)
 		{
 			State = EZombieState::Attack;
+			UE_LOG(LogAfterfall, Log, TEXT("Zombie %s enters Attack (%0.1fm)"),
+				*GetName(), VictimDistM);
 			break;
 		}
 		GetCharacterMovement()->MaxWalkSpeed = ChaseSpeed;
@@ -317,7 +325,11 @@ void AZombiePrototype::AITick()
 			const FVector Dir = (Victim->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 			SetActorRotation(Dir.Rotation());
 		}
-		if (bCanAttack)
+		if (!bCanAttack)
+		{
+			break; // cooldown: next bite in 1.2 s
+		}
+		UE_LOG(LogAfterfall, Log, TEXT("Zombie %s attacks (%.1fm)"), *GetName(), VictimDistM);
 		{
 			bCanAttack = false;
 			if (UHealthComponent* H = Victim->FindComponentByClass<UHealthComponent>())
@@ -325,6 +337,11 @@ void AZombiePrototype::AITick()
 				H->ServerTakeDamage(MeleeDamage);
 				UE_LOG(LogAfterfall, Log, TEXT("Zombie %s hits %s for %.0f"),
 					*GetName(), *Victim->GetName(), MeleeDamage);
+			}
+			// Injury loop: damage -> wound (canonical per-part ledger) -> bleeding.
+			if (UInjuryStateComponent* Injury = Victim->FindComponentByClass<UInjuryStateComponent>())
+			{
+				Injury->ServerApplyWound(EBodyPart::Torso, WoundSeverityPerHit);
 			}
 			FTimerHandle Hnd;
 			GetWorld()->GetTimerManager().SetTimer(Hnd, [this]() { bCanAttack = true; }, 1.2f, false);
@@ -481,10 +498,18 @@ void AZombiePrototype::Die(const FString& Cause)
 	}
 	State = EZombieState::Dead;
 	GetWorld()->GetTimerManager().ClearTimer(AITimer);
-	// Corpse: stop moving, drop collision, keep grey body visible 5s.
+	// Corpse: stop AI movement, then hand the body to the articulated solver.
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
-	SetActorEnableCollision(false);
+	if (Body)
+	{
+		Body->EnterRagdoll();
+	}
+	if (!Body || !Body->IsRagdoll())
+	{
+		// Fallback (no parts bound): old static-corpse behaviour.
+		SetActorEnableCollision(false);
+	}
 
 	if (!bDeathRecorded)
 	{
@@ -522,4 +547,40 @@ void AZombiePrototype::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AZombiePrototype, HP);
 	DOREPLIFETIME(AZombiePrototype, StableId);
+}
+
+// ------------------------------------------------------------ interaction ---
+
+FText AZombiePrototype::GetInteractPrompt_Implementation() const
+{
+	if (!Body || !Body->IsRagdoll())
+	{
+		return FText::GetEmpty();
+	}
+	return FText::FromString(Body->IsGrabbed() ? TEXT("Release Body (E)") : TEXT("Drag Body (E)"));
+}
+
+bool AZombiePrototype::CanInteract_Implementation(AController* Caller) const
+{
+	(void)Caller;
+	return Body != nullptr && Body->IsRagdoll();
+}
+
+void AZombiePrototype::ServerInteract_Implementation(AController* Caller)
+{
+	if (!HasAuthority() || !Body || !Body->IsRagdoll())
+	{
+		return;
+	}
+	// One held body per grabber: interact again to release.
+	if (Body->IsGrabbed())
+	{
+		Body->ServerRelease();
+		return;
+	}
+	if (!Body->ServerGrab(Caller))
+	{
+		UE_LOG(LogAfterfall, Verbose, TEXT("Zombie grab rejected for %s"),
+			*GetNameSafe(Caller));
+	}
 }

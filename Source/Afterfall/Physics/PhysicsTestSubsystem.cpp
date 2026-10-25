@@ -1,4 +1,5 @@
 #include "PhysicsTestSubsystem.h"
+#include "Afterfall.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Components/StaticMeshComponent.h"

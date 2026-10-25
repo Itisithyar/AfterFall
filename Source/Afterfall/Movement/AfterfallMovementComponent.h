@@ -69,6 +69,22 @@ public:
 	/** True while hauling a heavy object. Server-authoritative. */
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Carry")
 	bool bCarryingHeavy = false;
+	/** Carried mass (kg) used to derive load ratio. */
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Load")
+	float CarriedMassKg = 0.f;
+	/** Reference mass (kg) for dimensionless load ratio. */
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Load")
+	float ReferenceMassKg = 15.f;
+	/** Load ratio lambda = CarriedMassKg / ReferenceMassKg. */
+	float LoadRatio = 0.f;
+	/** Server writer for carried mass. */
+	void SetCarriedMass(float MassKg);
+
+	/** Telemetry getters. */
+	float GetLoadRatio() const { return LoadRatio; }
+	float GetEffectiveMaxSpeed() const { return EffectiveMaxSpeed; }
+	float GetEffectiveAcceleration() const { return EffectiveAcceleration; }
+	float GetEffectiveBraking() const { return EffectiveBraking; }
 
 	/** Client intent entry point. Routes to server when not authoritative. */
 	void SetSprinting(bool bWantSprint);
@@ -96,6 +112,9 @@ protected:
 private:
 	float SimTimeSec = 0.f;
 	double StepAccumulator = 0.0;
+	float EffectiveMaxSpeed = 0.f;
+	float EffectiveAcceleration = 0.f;
+	float EffectiveBraking = 0.f;
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerSetSprinting(bool bInWantSprint);

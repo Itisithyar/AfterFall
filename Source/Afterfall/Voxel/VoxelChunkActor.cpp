@@ -153,6 +153,31 @@ void AVoxelChunkActor::ServerInitializeChunk()
 		VoxelData.CountSolid(), ServerSeq);
 }
 
+void AVoxelChunkActor::ServerAdoptSnapshot(const FVoxelChunkData& Snapshot, int32 InSeq)
+{
+	if (!HasAuthority())
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("VOXELCHUNK adopt rejected (server only)"));
+		return;
+	}
+	if (!Snapshot.IsValid())
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("VOXELCHUNK adopt rejected (invalid data)"));
+		return;
+	}
+	VoxelData = Snapshot;
+	ServerSeq = FMath::Max(InSeq, 0);
+	LastAppliedSeq = ServerSeq;
+	PendingEdits.Reset();
+	EditLog.Reset();
+	MarkMeshDirty();
+	// Collision must be correct on the frame the chunk reappears, not next tick.
+	FlushMeshRebuild();
+	ServerSendSnapshotToAll();
+	UE_LOG(LogAfterfall, Log, TEXT("VOXELCHUNK restored solid=%d seq=%d"),
+		VoxelData.CountSolid(), ServerSeq);
+}
+
 bool AVoxelChunkActor::ServerApplyVoxelEdit(const FIntVector& Local, uint8 State)
 {
 	if (!HasAuthority())
@@ -214,6 +239,13 @@ bool AVoxelChunkActor::ServerApplyFractureImpact(const FVector& ImpactPos, const
 	FIntVector Start = FVoxelBasis::WorldToVoxel(ImpactPos - GetActorLocation(), FVector::ZeroVector);
 	if (!FVoxelChunkData::IsValidCoord(Start)) return false;
 	AfterfallFracture::FFractureResult R = AfterfallFracture::Solve(Start, Seed, Material, Energy, 8, ImpactDir);
+	// Quadratic severity gate: a sub-threshold impact dents only. Nothing is
+	// removed — not even the initiation cell — so weak hits cannot nibble
+	// voxels. The server remains the only path that mutates cells.
+	if (!R.bInitiated)
+	{
+		return false;
+	}
 	int32 Applied = 0;
 	for (const FIntVector& C : R.Path)
 	{

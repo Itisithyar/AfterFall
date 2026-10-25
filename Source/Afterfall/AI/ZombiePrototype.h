@@ -14,9 +14,11 @@
 #include "Entities/EntityLifecycle.h"
 #include "Combat/BodyDamageTypes.h"
 #include "Combat/DamageResolver.h"
+#include "Interaction/Interactable.h"
 #include "ZombiePrototype.generated.h"
 
 class UStaticMeshComponent;
+class UArticulatedBodyComponent;
 
 // EBodyPart lives in Combat/BodyDamageTypes.h (shared with DamageResolver).
 UENUM()
@@ -47,7 +49,7 @@ struct FZombieDamageRecord
 };
 
 UCLASS()
-class AFTERFALL_API AZombiePrototype : public ACharacter
+class AFTERFALL_API AZombiePrototype : public ACharacter, public IInteractable
 {
 	GENERATED_BODY()
 
@@ -67,6 +69,16 @@ public:
 	UStaticMeshComponent* PartLegL = nullptr;
 	UPROPERTY(VisibleAnywhere, Category = "Afterfall|Zombie|Body")
 	UStaticMeshComponent* PartLegR = nullptr;
+
+	// Articulated death body: joins the parts with constraints and exposes
+	// server-authoritative grab/release. Inert until Die().
+	UPROPERTY(VisibleAnywhere, Category = "Afterfall|Zombie|Body")
+	UArticulatedBodyComponent* Body = nullptr;
+
+	// Ragdoll drag through the standard interaction channel (E on a corpse).
+	virtual FText GetInteractPrompt_Implementation() const override;
+	virtual bool CanInteract_Implementation(AController* Caller) const override;
+	virtual void ServerInteract_Implementation(AController* Caller) override;
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Zombie")
 	float HP = 100.f;
@@ -93,6 +105,9 @@ public:
 	float DisengageRangeM = 40.f;
 	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Zombie|AI")
 	float MeleeDamage = 10.f;
+	// Injury loop: each confirmed attack adds a bleeding wound to the victim.
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Zombie|Injury")
+	float WoundSeverityPerHit = 1.f;
 	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Zombie|AI")
 	float ChaseSpeed = 220.f;
 	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Zombie|AI")

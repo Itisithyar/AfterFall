@@ -26,6 +26,17 @@ void UAfterfallMovementComponent::SetSprinting(bool bWant)
 	}
 }
 
+void UAfterfallMovementComponent::SetCarriedMass(float MassKg)
+{
+	if (MassKg < 0.f) MassKg = 0.f;
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		CarriedMassKg = MassKg;
+	}
+	LoadRatio = (ReferenceMassKg > 0.f) ? (CarriedMassKg / ReferenceMassKg) : 0.f;
+	bCarryingHeavy = CarriedMassKg >= Tuning.HeavyMassKg;
+}
+
 void UAfterfallMovementComponent::SetCarryingHeavy(bool bHeavy)
 {
 	if (GetOwner() && GetOwner()->HasAuthority())
@@ -123,10 +134,33 @@ void UAfterfallMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 			Tuning.SprintDurationSec, Tuning.SprintRecoverySec, SimDelta);
 	}
 
-	// Per-state momentum parameters (engine still owns collision integration).
+	// Load ratio.
+	LoadRatio = (ReferenceMassKg > 0.f) ? (CarriedMassKg / ReferenceMassKg) : 0.f;
+	const float ClampLoad = FMath::Clamp(LoadRatio, 0.f, 4.f);
+	// Bounded game-design response functions (provisional).
+	const float AccelFactor = FMath::Clamp(1.f - 0.15f * ClampLoad, 0.3f, 1.f);
+	const float SpeedFactor = FMath::Clamp(1.f - 0.08f * ClampLoad, 0.5f, 1.f);
+	const float BrakeFactor = FMath::Clamp(1.f - 0.1f * ClampLoad, 0.4f, 1.f);
+
 	const bool bSprinting = SprintState == EAfterfallSprintState::Sprinting;
-	MaxAcceleration = bSprinting ? Tuning.SprintAcceleration : Tuning.NormalAcceleration;
-	BrakingDecelerationWalking = Tuning.BrakingDeceleration;
+	const float BaseAccel = bSprinting ? Tuning.SprintAcceleration : Tuning.NormalAcceleration;
+	MaxAcceleration = BaseAccel * AccelFactor;
+	EffectiveAcceleration = MaxAcceleration;
+
+	float BaseSpeed = Tuning.NormalMaxSpeed;
+	if (bCarryingHeavy)
+	{
+		BaseSpeed = FMath::Min(BaseSpeed, Tuning.CarryCapCmS);
+	}
+	if (SprintState == EAfterfallSprintState::Sprinting)
+	{
+		BaseSpeed = FMath::Max(BaseSpeed, Tuning.SprintMaxSpeed);
+	}
+	MaxWalkSpeed = BaseSpeed * SpeedFactor;
+	EffectiveMaxSpeed = MaxWalkSpeed;
+
+	BrakingDecelerationWalking = Tuning.BrakingDeceleration * BrakeFactor;
+	EffectiveBraking = BrakingDecelerationWalking;
 	GroundFriction = Tuning.GroundFriction;
 	AirControl = Tuning.AirControl;
 
@@ -153,4 +187,5 @@ void UAfterfallMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetimePro
 	DOREPLIFETIME(UAfterfallMovementComponent, SprintTimeLeft);
 	DOREPLIFETIME(UAfterfallMovementComponent, RecoveryTimeLeft);
 	DOREPLIFETIME(UAfterfallMovementComponent, bCarryingHeavy);
+	DOREPLIFETIME(UAfterfallMovementComponent, CarriedMassKg);
 }

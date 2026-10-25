@@ -42,5 +42,10 @@ private:
 	void RunAutoTest();
 	/** Building parts spawned by the last Ensure (impact + reset checks). */
 	TArray<TWeakObjectPtr<AStructuralActor>> Building;
+	/** First glass/window part, used by the breakable-glass assertion. */
+	TWeakObjectPtr<AStructuralActor> FirstWindow;
+	int32 StructuralPartCount = 0;
+	int32 PropCount = 0;
+	int32 BuildingCount = 0;
 	FVector AnchorCached = FVector::ZeroVector;
 };

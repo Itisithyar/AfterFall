@@ -4,8 +4,11 @@
 #include "AfterfallHUD.h"
 #include "AfterfallCharacter.h"
 #include "Combat/HealthComponent.h"
+#include "Combat/InjuryStateComponent.h"
 #include "Inventory/InventoryComponent.h"
 #include "Interaction/InteractComponent.h"
+#include "UI/RadialMenuComponent.h"
+#include "Destruction/FractureSolver.h"
 #include "AI/ZombiePrototype.h"
 #include "Physics/PhysicsValidationSubsystem.h"
 #include "Engine/Canvas.h"
@@ -25,7 +28,22 @@ AAfterfallHUD::AAfterfallHUD()
 {
 	Super::Tick(DeltaTime);
 	AAfterfallCharacter* P = MenuPawn();
-	if (!P || !P->IsQuickMenuOpen())
+	if (!P)
+	{
+		return;
+	}
+
+	// Inventory input takes priority when open (movement/look already gated
+	// by the character; the HUD owns UI navigation + close).
+	if (P->IsInventoryOpen())
+	{
+		if (HandleInventoryInput(P))
+		{
+			return;
+		}
+	}
+
+	if (!P->IsQuickMenuOpen())
 	{
 		return;
 	}
@@ -124,6 +142,9 @@ void AAfterfallHUD::DrawHUD()
 		Canvas->SizeX * 0.5f - 6.f * VS, Canvas->SizeY * 0.5f - 14.f * VS,
 		Font, 1.2f * VS);
 
+	// Contextual radial wheel (crosshair-anchored, Canvas-drawn).
+	DrawRadialWheel(Pawn, Font, VS);
+
 	// Health bar (top-left).
 	const float Ratio = Pawn->Health ? Pawn->Health->GetHPRatio() : 0.f;
 	const float BW = 300.f * VS, BH = 26.f * VS;
@@ -163,6 +184,39 @@ void AAfterfallHUD::DrawHUD()
 	DrawText(FString::Printf(TEXT("Zombies %d"), AliveZ),
 		FLinearColor(1.f, 0.5f, 0.5f), Pad, Pad + (BH + 8.f * VS) * 3, Font, 1.1f * VS);
 
+	// Injury readout: the canonical UInjuryStateComponent ledger is the only
+	// source (no second bleeding count). Treatment progress comes from the
+	// same replicated session state the server validates.
+	if (Pawn->Injury)
+	{
+		int32 Bleeding = 0;
+		int32 Wounded = 0;
+		int32 Worst = 0;
+		for (const FInjuryRecord& R : Pawn->Injury->PartInjuries)
+		{
+			if (R.bBleeding) { ++Bleeding; }
+			if (R.bWounded) { ++Wounded; }
+			Worst = FMath::Max(Worst, R.Severity);
+		}
+		const float InjuryY = Pad + (BH + 8.f * VS) * 4;
+		if (Bleeding > 0)
+		{
+			DrawText(FString::Printf(TEXT("BLEEDING %d - hold E + LMB"), Bleeding),
+				FLinearColor(1.f, 0.15f, 0.15f), Pad, InjuryY, Font, 1.1f * VS);
+		}
+		else if (Wounded > 0)
+		{
+			DrawText(FString::Printf(TEXT("WOUNDS %d (severity %d)"), Wounded, Worst),
+				FLinearColor(1.f, 0.7f, 0.3f), Pad, InjuryY, Font, 1.1f * VS);
+		}
+		if (Pawn->Injury->TreatmentState == ETreatmentState::Treating)
+		{
+			DrawText(FString::Printf(TEXT("Treating %d%%"),
+				FMath::RoundToInt(Pawn->Injury->TreatmentProgress * 100.f)),
+				FLinearColor(0.6f, 1.f, 0.6f), Pad, InjuryY + 22.f * VS, Font, 1.1f * VS);
+		}
+	}
+
 	// Death overlay (menu offers the immediate Respawn button).
 	if (Pawn->Health && Pawn->Health->bIsDead)
 	{
@@ -178,6 +232,115 @@ void AAfterfallHUD::DrawHUD()
 
 	// Quick menu (top-left, content-sized, game visible around it).
 	DrawQuickMenu(Pawn, Font, VS, FPlatformTime::Seconds());
+
+	// Inventory overlay (Canvas-drawn, zero UMG).
+	if (Pawn->IsInventoryOpen())
+	{
+		DrawInventory(Pawn, Font, VS);
+	}
+}
+
+void AAfterfallHUD::DrawRadialWheel(AAfterfallCharacter* Pawn, UFont* Font, float VS)
+{
+	// Visuals only: every value read here is local presentation state owned
+	// by URadialMenuComponent (options, selection, radius, dead zone).
+	// Confirmation/cancellation stay in the character input controller;
+	// this function issues no RPC and mutates no gameplay state.
+	if (!Pawn || !Pawn->RadialMenu || !Pawn->RadialMenu->bIsMenuOpen)
+	{
+		return;
+	}
+	const URadialMenuComponent* R = Pawn->RadialMenu;
+	const int32 N = R->Options.Num();
+	if (N <= 0)
+	{
+		return;
+	}
+
+	// Anchor: stored crosshair point, falling back to screen center (the
+	// crosshair IS screen center in this project; the camera never moves).
+	float CX = (R->MenuCenter.X > 0.f) ? R->MenuCenter.X : Canvas->SizeX * 0.5f;
+	float CY = (R->MenuCenter.Y > 0.f) ? R->MenuCenter.Y : Canvas->SizeY * 0.5f;
+
+	// DPI-aware sizing. Assumptions (documented, tunable in one place):
+	// 96 px/inch baseline (Windows default), 3-inch wheel diameter, and the
+	// project's VS = SizeY/1080 resolution scale. True physical inches vary
+	// with panel DPI; PixelsPerInch/WheelUIScale retune per platform.
+	// Resulting ring radius: 1080p -> 144px, 1440p -> 192px, 2160p -> 288px.
+	const float Radius = R->WheelRadiusPx() * VS;
+	const float DeadR = R->SelectionDeadZonePx * VS;
+	const float Dot = FMath::Max(2.5f * VS, 2.f);
+
+	// Outer ring (72 dotted segments; DrawRect-only, no texture needed).
+	const int32 RingDots = 72;
+	for (int32 i = 0; i < RingDots; ++i)
+	{
+		const float A = (float)i / (float)RingDots * 2.f * PI;
+		DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.55f),
+			CX + FMath::Cos(A) * Radius - Dot * 0.5f,
+			CY + FMath::Sin(A) * Radius - Dot * 0.5f, Dot, Dot);
+	}
+
+	// Dead-zone ring: inside this radius no sector is selected.
+	const int32 DeadDots = 32;
+	for (int32 i = 0; i < DeadDots; ++i)
+	{
+		const float A = (float)i / (float)DeadDots * 2.f * PI;
+		DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.25f),
+			CX + FMath::Cos(A) * DeadR - Dot * 0.5f,
+			CY + FMath::Sin(A) * DeadR - Dot * 0.5f, Dot, Dot);
+	}
+
+	// Sector divider ticks at each boundary. Sector i spans Atan2 angles
+	// [i*step - PI, (i+1)*step - PI) with step = 2*PI/N, matching the
+	// SectorForDrag contract (sector 0 starts at screen-right, clockwise).
+	const float Step = 2.f * PI / (float)N;
+	for (int32 i = 0; i < N; ++i)
+	{
+		const float B = (float)i * Step - PI;
+		DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.35f),
+			CX + FMath::Cos(B) * (Radius + 8.f * VS) - Dot * 0.5f,
+			CY + FMath::Sin(B) * (Radius + 8.f * VS) - Dot * 0.5f, Dot, Dot);
+	}
+
+	// Selection spoke: dotted line from the dead zone to the ring along the
+	// highlighted sector's mid-angle, so the current choice reads at a glance.
+	if (R->SelectedOption >= 0 && R->SelectedOption < N)
+	{
+		const float Mid = ((float)R->SelectedOption + 0.5f) * Step - PI;
+		const float DX = FMath::Cos(Mid), DY = FMath::Sin(Mid);
+		const int32 SpokeDots = 16;
+		for (int32 i = 0; i <= SpokeDots; ++i)
+		{
+			const float L = DeadR + (Radius - DeadR) * (float)i / (float)SpokeDots;
+			DrawRect(FLinearColor(1.f, 0.9f, 0.3f, 0.9f),
+				CX + DX * L - Dot * 0.5f, CY + DY * L - Dot * 0.5f, Dot, Dot);
+		}
+	}
+
+	// Labels at each sector mid-angle, just outside the ring. Selected =
+	// yellow, disabled = dimmed (server still has the final say on tap).
+	for (int32 i = 0; i < N; ++i)
+	{
+		const FRadialMenuOption& Opt = R->Options[i];
+		const float Mid = ((float)i + 0.5f) * Step - PI;
+		const float L = Radius + 34.f * VS;
+		const FString Label = Opt.DisplayName.ToString();
+		float TW = 0.f, TH = 0.f;
+		Canvas->TextSize(Font, Label, TW, TH, 1.1f * VS, 1.1f * VS);
+		const FLinearColor Col = !Opt.bIsEnabled ? FLinearColor(0.5f, 0.5f, 0.5f, 0.8f)
+			: (i == R->SelectedOption ? FLinearColor(1.f, 0.9f, 0.3f) : FLinearColor::White);
+		DrawText(Label, Col, CX + FMath::Cos(Mid) * L - TW * 0.5f,
+			CY + FMath::Sin(Mid) * L - TH * 0.5f, Font, 1.1f * VS);
+	}
+
+	// One-line hint under the wheel. The game never takes the cursor for
+	// the wheel, so there is no cursor/input state to restore on close.
+	const FString Hint = TEXT("release LMB to confirm - RMB / Esc cancels");
+	float HW = 0.f, HH = 0.f;
+	Canvas->TextSize(Font, Hint, HW, HH, 0.9f * VS, 0.9f * VS);
+	DrawText(Hint, FLinearColor(1.f, 1.f, 1.f, 0.7f),
+		CX - HW * 0.5f, CY + Radius + 64.f * VS, Font, 0.9f * VS);
 }
 
 void AAfterfallHUD::DrawQuickMenu(AAfterfallCharacter* Pawn, UFont* Font, float VS, double Now)
@@ -276,7 +439,7 @@ void AAfterfallHUD::DrawQuickMenu(AAfterfallCharacter* Pawn, UFont* Font, float 
 	}
 	else if (Page == EQuickMenuPage::Lab)
 	{
-		ExtraH = 96.f * VS;
+		ExtraH = 132.f * VS; // summary + log + quadratic tuning rows
 	}
 	else if (Page == EQuickMenuPage::Controls)
 	{
@@ -370,12 +533,268 @@ void AAfterfallHUD::DrawLabPage(const FBox2D& Inner, UFont* Font, float VS)
 	DrawText(bLog ? TEXT("Impact logging: ON") : TEXT("Impact logging: OFF"),
 		FLinearColor(0.7f, 0.9f, 0.7f),
 		Inner.Min.X + 4.f * VS, Inner.Min.Y + 44.f * VS, Font, 0.8f * VS);
+
+	// Quadratic severity tuning (single tunable instance in FractureSolver).
+	// Display-only: values are set via AfterfallFracture::SetSeverityResponse;
+	// the lab page exposes current state + the derived initiation energy.
+	const AfterfallFracture::FFractureSeverityResponse& QR = AfterfallFracture::GetSeverityResponse();
+	const float XStar = AfterfallFracture::InitiationSeverityX(QR);
+	DrawText(FString::Printf(TEXT("Quad K=%.0f Eref=%.0fJ Dthr=%.0f"),
+		QR.K, QR.ReferenceEnergyJ, QR.InitiationThreshold),
+		FLinearColor(0.7f, 0.8f, 1.f),
+		Inner.Min.X + 4.f * VS, Inner.Min.Y + 64.f * VS, Font, 0.8f * VS);
+	DrawText(FString::Printf(TEXT("x*=%.2f Einits=%.0fJ (gates)"),
+		XStar, XStar * QR.ReferenceEnergyJ),
+		FLinearColor(0.7f, 0.8f, 1.f),
+		Inner.Min.X + 4.f * VS, Inner.Min.Y + 86.f * VS, Font, 0.8f * VS);
+	DrawText(FString::Printf(TEXT("CapJ P%.0f W%.0f St%.0f M%.0f C%.0f"),
+		AfterfallFracture::MaterialStrengthJ(EMaterialType::Plaster),
+		AfterfallFracture::MaterialStrengthJ(EMaterialType::Wood),
+		AfterfallFracture::MaterialStrengthJ(EMaterialType::Stone),
+		AfterfallFracture::MaterialStrengthJ(EMaterialType::Metal),
+		AfterfallFracture::MaterialStrengthJ(EMaterialType::Concrete)),
+		FLinearColor(0.9f, 0.8f, 0.6f),
+		Inner.Min.X + 4.f * VS, Inner.Min.Y + 108.f * VS, Font, 0.8f * VS);
 }
 
 void AAfterfallHUD::DrawControlsPage(AAfterfallCharacter* Pawn, const FBox2D& Inner, UFont* Font, float VS)
 {
 	(void)Pawn; (void)Inner; (void)Font; (void)VS;
 	// Rows are buttons drawn by DrawQuickMenu; nothing extra to paint.
+}
+
+// ---------------------------------------------------------------- Inventory UI ---
+
+void AAfterfallHUD::DrawInventory(AAfterfallCharacter* Pawn, UFont* Font, float VS)
+{
+	if (!Pawn || !Pawn->Inventory || !Canvas)
+	{
+		return;
+	}
+
+	const float Pad = 24.f * VS;
+	const float PanelW = 960.f * VS;
+	const float PanelH = 640.f * VS;
+	const float PanelX = (Canvas->SizeX - PanelW) * 0.5f;
+	const float PanelY = (Canvas->SizeY - PanelH) * 0.5f;
+
+	DrawRect(FLinearColor(0.05f, 0.06f, 0.08f, 0.95f), PanelX, PanelY, PanelW, PanelH);
+	DrawRect(FLinearColor(0.4f, 0.45f, 0.55f, 0.9f), PanelX, PanelY, PanelW, 1.f);
+	DrawRect(FLinearColor(0.4f, 0.45f, 0.55f, 0.9f), PanelX, PanelY + PanelH - 1.f, PanelW, 1.f);
+
+	DrawText(TEXT("INVENTORY"), FLinearColor::White, PanelX + Pad, PanelY + Pad, Font, 1.2f * VS);
+
+	// Category tabs.
+	const TArray<FName> Categories = {
+		FName(TEXT("All")), FName(TEXT("Weapons")), FName(TEXT("Equipment")),
+		FName(TEXT("Medical")), FName(TEXT("Resources")), FName(TEXT("Food & Drink")),
+		FName(TEXT("Quest"))
+	};
+	const float TabW = 110.f * VS;
+	const float TabH = 30.f * VS;
+	float TabX = PanelX + Pad;
+	for (int32 i = 0; i < Categories.Num(); ++i)
+	{
+		const bool bSelected = (InventorySelectedCategory == i);
+		DrawRect(bSelected ? FLinearColor(0.25f, 0.45f, 0.75f, 0.95f) : FLinearColor(0.16f, 0.18f, 0.22f, 0.9f),
+			TabX, PanelY + Pad + 30.f, TabW, TabH);
+		DrawText(Categories[i].ToString(), bSelected ? FLinearColor::White : FLinearColor(0.8f, 0.8f, 0.8f),
+			TabX + 8.f * VS, PanelY + Pad + 34.f * VS, Font, 1.0f * VS);
+		TabX += TabW + 8.f * VS;
+	}
+
+	// Item grid.
+	const int32 Cols = 4;
+	const int32 Rows = 6;
+	const float SlotW = 70.f * VS;
+	const float SlotH = 70.f * VS;
+	const float GridX = PanelX + Pad;
+	const float GridY = PanelY + Pad + 70.f * VS;
+
+	EItemCategory FilterCat = (InventorySelectedCategory == 0) ? EItemCategory::All :
+		static_cast<EItemCategory>(InventorySelectedCategory);
+
+	TArray<FInventorySlot> Filtered = Pawn->Inventory->GetItemsByCategory(FilterCat);
+
+	for (int32 r = 0; r < Rows; ++r)
+	{
+		for (int32 c = 0; c < Cols; ++c)
+		{
+			int32 SlotIdx = r * Cols + c;
+			float SX = GridX + c * (SlotW + 8.f * VS);
+			float SY = GridY + r * (SlotH + 8.f * VS);
+
+			FInventorySlot* Slot = (SlotIdx < Filtered.Num()) ? &Filtered[SlotIdx] : nullptr;
+			const bool bSelected = (InventorySelectedSlot == SlotIdx);
+			const bool bHovered = (InventoryHoveredSlot == SlotIdx);
+			const bool bHasItem = Slot && !Slot->IsEmpty();
+
+			DrawRect(bSelected ? FLinearColor(0.35f, 0.55f, 0.85f, 0.95f)
+				: (bHovered ? FLinearColor(0.25f, 0.28f, 0.35f, 0.9f)
+				: (bHasItem ? FLinearColor(0.12f, 0.14f, 0.18f, 0.9f)
+				: FLinearColor(0.08f, 0.10f, 0.14f, 0.8f))),
+				SX, SY, SlotW, SlotH);
+
+			if (bHasItem)
+			{
+				FLinearColor IconCol = FLinearColor::White;
+				EItemCategory IconCat = Slot->Item.ItemId.IsEqual(TEXT("AF_MED_Bandage"))
+					? EItemCategory::Medical : FilterCat;
+				if (IconCat == EItemCategory::Weapons) IconCol = FLinearColor(1.f, 0.4f, 0.4f);
+				else if (IconCat == EItemCategory::Equipment) IconCol = FLinearColor(0.4f, 1.f, 0.4f);
+				else if (IconCat == EItemCategory::Medical) IconCol = FLinearColor(0.4f, 0.8f, 1.f);
+				else if (IconCat == EItemCategory::Resources) IconCol = FLinearColor(1.f, 0.8f, 0.4f);
+				else if (IconCat == EItemCategory::FoodDrink) IconCol = FLinearColor(1.f, 1.f, 0.4f);
+				else if (IconCat == EItemCategory::Quest) IconCol = FLinearColor(1.f, 0.4f, 1.f);
+				else IconCol = FLinearColor(0.8f, 0.8f, 0.8f);
+				DrawRect(IconCol, SX + 10.f * VS, SY + 10.f * VS, SlotW - 20.f * VS, SlotH - 20.f * VS);
+
+				FString ItemName = Slot->Item.ItemId.ToString();
+				if (ItemName.Len() > 12) ItemName = ItemName.Left(10) + TEXT("..");
+				DrawText(ItemName, FLinearColor::White, SX + 4.f * VS, SY + 4.f * VS, Font, 0.8f * VS);
+
+				if (Slot->Item.Count > 1)
+				{
+					DrawText(FString::Printf(TEXT("x%d"), Slot->Item.Count), FLinearColor::Yellow,
+						SX + SlotW - 20.f * VS, SY + SlotH - 14.f * VS, Font, 0.9f * VS);
+				}
+			}
+			else
+			{
+				DrawText(TEXT("-"), FLinearColor(0.4f, 0.4f, 0.4f),
+					SX + SlotW * 0.5f - 4.f * VS, SY + SlotH * 0.5f - 8.f * VS, Font, 1.0f * VS);
+			}
+		}
+	}
+
+	// Selected item details panel (right side).
+	float DetailX = PanelX + PanelW - Pad - 260.f * VS;
+	float DetailY = GridY;
+	float DetailW = 260.f * VS;
+	DrawRect(FLinearColor(0.08f, 0.10f, 0.14f, 0.95f), DetailX, DetailY, DetailW, PanelH - 70.f * VS);
+	DrawRect(FLinearColor(0.4f, 0.45f, 0.55f, 0.9f), DetailX, DetailY, DetailW, 1.f);
+
+	if (InventorySelectedSlot >= 0 && InventorySelectedSlot < Filtered.Num())
+	{
+		const FInventorySlot& Slot = Filtered[InventorySelectedSlot];
+		if (!Slot.IsEmpty())
+		{
+			DrawText(Slot.Item.ItemId.ToString(), FLinearColor::White, DetailX + Pad, DetailY + Pad, Font, 1.1f * VS);
+			DrawText(FString::Printf(TEXT("Count: %d"), Slot.Item.Count), FLinearColor::White,
+				DetailX + Pad, DetailY + Pad + 24.f * VS, Font, 1.0f * VS);
+			DrawText(FString::Printf(TEXT("Condition: %.0f"), Slot.Item.Condition * 100.f), FLinearColor::White,
+				DetailX + Pad, DetailY + Pad + 40.f * VS, Font, 1.0f * VS);
+
+			float BtnY = DetailY + Pad + 80.f * VS;
+			float BtnW = DetailW - Pad * 2.f;
+			float BtnH = 28.f * VS;
+
+			FString ActionLabel = TEXT("Use");
+			UItemDefinition* Def = Pawn->Inventory->GetItemDefinition(Slot.Item.ItemId);
+			if (Def && Def->bEquippable) ActionLabel = TEXT("Equip");
+			else if (!Def->MedicalItemId.IsNone()) ActionLabel = TEXT("Use (Treat)");
+
+			DrawRect(FLinearColor(0.25f, 0.45f, 0.75f, 0.95f), DetailX + Pad, BtnY, BtnW, BtnH);
+			DrawText(ActionLabel, FLinearColor::White, DetailX + Pad + 8.f * VS, BtnY + 4.f * VS, Font, 1.0f * VS);
+
+			BtnY += BtnH + 8.f * VS;
+			DrawRect(FLinearColor(0.6f, 0.2f, 0.2f, 0.95f), DetailX + Pad, BtnY, BtnW, BtnH);
+			DrawText(TEXT("Drop"), FLinearColor::White, DetailX + Pad + 8.f * VS, BtnY + 4.f * VS, Font, 1.0f * VS);
+		}
+	}
+
+	float HintY = PanelY + PanelH - Pad - 20.f * VS;
+	DrawText(TEXT("Tab/Esc=Close  Arrows=Navigate  E=Use  G=Drop"), FLinearColor(0.7f, 0.7f, 0.7f),
+		PanelX + Pad, HintY, Font, 0.9f * VS);
+}
+
+bool AAfterfallHUD::HandleInventoryInput(AAfterfallCharacter* Pawn)
+{
+	if (!Pawn || !Pawn->IsInventoryOpen())
+	{
+		return false;
+	}
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC)
+	{
+		return false;
+	}
+
+	if (PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape))
+	{
+		Pawn->CloseInventory();
+		InventorySelectedSlot = -1;
+		InventoryHoveredSlot = -1;
+		return true;
+	}
+
+	double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (Now - InventoryLastNavTime < 0.15)
+	{
+		return true;
+	}
+
+	if (PC->WasInputKeyJustPressed(EKeys::Left) || PC->WasInputKeyJustPressed(EKeys::Gamepad_DPad_Left))
+	{
+		InventoryNavigate(-1, 0);
+		InventoryLastNavTime = Now;
+		return true;
+	}
+	if (PC->WasInputKeyJustPressed(EKeys::Right) || PC->WasInputKeyJustPressed(EKeys::Gamepad_DPad_Right))
+	{
+		InventoryNavigate(1, 0);
+		InventoryLastNavTime = Now;
+		return true;
+	}
+	if (PC->WasInputKeyJustPressed(EKeys::Up) || PC->WasInputKeyJustPressed(EKeys::Gamepad_DPad_Up))
+	{
+		InventoryNavigate(0, -1);
+		InventoryLastNavTime = Now;
+		return true;
+	}
+	if (PC->WasInputKeyJustPressed(EKeys::Down) || PC->WasInputKeyJustPressed(EKeys::Gamepad_DPad_Down))
+	{
+		InventoryNavigate(0, 1);
+		InventoryLastNavTime = Now;
+		return true;
+	}
+
+	if (PC->WasInputKeyJustPressed(EKeys::E) || PC->WasInputKeyJustPressed(EKeys::Gamepad_FaceButton_Bottom))
+	{
+		if (InventorySelectedSlot >= 0)
+		{
+			Pawn->ServerUseInventorySlot(InventorySelectedSlot);
+		}
+		return true;
+	}
+
+	if (PC->WasInputKeyJustPressed(EKeys::G))
+	{
+		if (InventorySelectedSlot >= 0)
+		{
+			Pawn->ServerDropInventorySlot(InventorySelectedSlot, 1);
+		}
+		return true;
+	}
+
+	return false;
+}
+
+void AAfterfallHUD::InventoryNavigate(int32 DeltaX, int32 DeltaY)
+{
+	if (DeltaX != 0)
+	{
+		InventorySelectedSlot += DeltaX;
+		if (InventorySelectedSlot < 0) InventorySelectedSlot = 0;
+		if (InventorySelectedSlot > 23) InventorySelectedSlot = 23;
+	}
+	if (DeltaY != 0)
+	{
+		InventorySelectedSlot += DeltaY * 4;
+		if (InventorySelectedSlot < 0) InventorySelectedSlot = 0;
+		if (InventorySelectedSlot > 23) InventorySelectedSlot = 23;
+	}
+	InventoryHoveredSlot = InventorySelectedSlot;
 }
 
 bool AAfterfallHUD::HandleMenuClick()

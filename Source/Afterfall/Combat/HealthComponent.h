@@ -45,6 +45,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Afterfall|Health")
 	void ServerRevive();
 
+	/** Server-only heal (bandage hook). */
+	UFUNCTION(BlueprintCallable, Category = "Afterfall|Health")
+	void ServerHeal(float Amount);
+
 	static float ClampDamage(float Amount) { return FMath::Clamp(Amount, 0.f, 200.f); }
 
 protected:

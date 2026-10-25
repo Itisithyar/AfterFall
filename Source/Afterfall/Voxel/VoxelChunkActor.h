@@ -53,6 +53,14 @@ public:
 	void ServerInitializeChunk();
 
 	/**
+	 * Server: adopt externally-held voxel state (streaming restore). Used when a
+	 * chunk was streamed out, so walking back does not resurrect the pristine
+	 * content and undo the player's destruction. Rebuilds mesh + collision and
+	 * pushes the adoption to connected clients.
+	 */
+	void ServerAdoptSnapshot(const FVoxelChunkData& Snapshot, int32 InSeq);
+
+	/**
 	 * Commit one voxel change. Rejects out-of-range coords, unknown material
 	 * ids, and no-op writes. Bumps the sequence and queues the replicated edit.
 	 */

@@ -1,0 +1,24 @@
+AFTERFALL — Oct 25 log analysis (FLINT, evidence-first)
+1) 00:55:01 EnsureFailed (packaged Afterfall.exe, AfterfallStaging_2026-10-24_pkg)
+   Ensure: "!IsComponentPSOPrecachingEnabled() || bPSOPrecacheCalled"
+   [Engine PSOPrecache.cpp:296]. HANDLED ensure (non-fatal "=== Handled ensure ===").
+   The engine continued: heavy PSO emission during first-load shader/PSO warmup;
+   SkyLight real-time capture updates and PSO precache misses are load-time
+   artifacts, NOT the root cause of any fatal failure. Process kept running
+   (log continues through 00:56:21; pole/pawn active; pickup event observed).
+2) Generated level "/Engine/Maps/Templates/OpenWorld/_Generated_/CGX8O6ITCT8PB63Y6Q4CTFLKF"
+   is the WorldPartition runtime streaming template used by Lvl_FirstPerson's
+   World Partition during AddToWorld. Expected engine behavior for a WP map;
+   the intended startup map itself is unchanged (Lvl_FirstPerson per
+   DefaultEngine.ini EditorStartupMap/GameDefaultMap). No map replacement made.
+3) FATAL assertion (separate incident, project binary "UnrealEditor.exe -game",
+   both 00:53:16 and 00:58:10):
+   "Assertion failed: GEditor [UnrealEd Subsystems/ActorEditorContextSubsystem.cpp:20]"
+   fires inside UWorldPartition::Initialize on launching the UN-pakaged game via
+   the editor binary without a GEditor instance. Distinct from (1): this is a
+   critical assertion, process dies in startup before visible rendering; no
+   crash when the PA packaged binary runs (UnrealEd absent).
+   User confirmed packaged game renders and is playable; black screen treated
+   as resolved on the observed runtime path.
+Threshold policy respected: ensure-handled entries were not conflated with the
+fatal assert; PSO misses/SkyLight updates are not claimed as root causes.

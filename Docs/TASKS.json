@@ -44,6 +44,34 @@
         "Friction and settling verified"
       ],
       "next_action": "Implement physics increments; run build/tests; update handoff."
+    },
+    {
+      "id": "flint-bandage-001",
+      "owner": "Flint",
+      "state": "in-progress",
+      "title": "Bleeding + bandage self-treatment (injury loop slice 1)",
+      "files": [
+        "Source/Afterfall/Combat/InjuryStateComponent.h",
+        "Source/Afterfall/Combat/InjuryStateComponent.cpp",
+        "Source/Afterfall/Combat/MedicalCapability.h",
+        "Source/Afterfall/Combat/MedicalCapability.cpp",
+        "Source/Afterfall/Tests/MedicalTreatmentTest.cpp",
+        "Source/Afterfall/AfterfallCharacter.h",
+        "Source/Afterfall/AfterfallCharacter.cpp",
+        "Source/Afterfall/AI/ZombiePrototype.h",
+        "Source/Afterfall/AI/ZombiePrototype.cpp"
+      ],
+      "acceptance": [
+        "Zombie attack creates a bleeding wound that drains HP over time",
+        "Hold E + LMB treats the most severe actively-bleeding wound",
+        "Bandage consumed server-side per treatment",
+        "Wound record persists after bleeding stops",
+        "Normal E/LMB behavior unchanged outside treatment context",
+        "Build compiles (exit 0) with the injury/bandage slice"
+      ],
+      "next_action": "COMPILE+PACKAGE PASS (2026-10-25, post-consolidation). RUNTIME BLOCKED: packaged runs stall ~2s after slice setup at the three 'Zombie ... pursues' lines (log frozen, ~1.5 cores busy); reproduces on the pre-medical package, so not caused by FR-003. Bandage acquisition is also unwired. Equip/draw UX + HUD feedback open. See Docs/FR-003-BANDAGE-RUNTIME-REPORT.md.",
+      "ownership": "Canonical: Combat/InjuryStateComponent + MedicalCapability (BEAM pipeline, adopted and wired by Flint); duplicate Combat/BleedingComponent was removed 2026-10-25. Do not reintroduce a second bleeding ledger (double HP drain).",
+      "evidence": "AfterfallEditor exit 0; BuildCookRun BUILD SUCCESSFUL exit 0 -> Desktop/AfterfallStaging_2026-10-24_injury_pkg; Automation Afterfall.Medical 3/3 Success (_medical_tests2.log); runtime log freezes at 3x 'Zombie ... pursues' in 4 launch modes and on the pre-medical package; authority audited server-only with replicated injury state."
     }
   ]
 }

@@ -10,13 +10,18 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Structural/StructuralTypes.h"
+#include "Animation/AdaptiveLimbTypes.h"
+#include "TimerManager.h"
+#include "UI/RadialMenuComponent.h"
 #include "AfterfallCharacter.generated.h"
 
 class UInventoryComponent;
 class UHealthComponent;
+class UInjuryStateComponent;
 class UInteractComponent;
 class UCarryComponent;
 class UAfterfallGrappleComponent;
+class UAdaptiveLimbComponent;
 class URadialMenuComponent;
 class UMatInteractionComponent;
 class UAfterfallMovementComponent;
@@ -67,9 +72,18 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Health")
 	UHealthComponent* Health;
 
+	// Canonical server-authoritative injury/medical ledger (BEAM Free Phase 1).
+	// Hold-E + LMB treatment routes into its treatment-session pipeline.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Bleeding")
+	UInjuryStateComponent* Injury;
+
 	// Rope/grapple traversal (server-authoritative attach; momentum preserved).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Traversal")
 	UAfterfallGrappleComponent* Grapple;
+
+	// Adaptive right arm: chest-relative reach, joint limits, wall contact.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Limb")
+	UAdaptiveLimbComponent* RightArm;
 
 	// Single held-object slot (pickup/drop/throw transaction owner).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Carry")
@@ -80,6 +94,10 @@ public:
 	UMatInteractionComponent* MatInteract;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|UI")
 	class URadialMenuComponent* RadialMenu;
+
+	// Last radial Inspect result (display-only, never replicated, no state). 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|UI")
+	FText LastInspectText;
 
 	// Backpack mat; deployed copy lives in the world as a separate storage.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Storage")
@@ -156,6 +174,7 @@ public:
 
 	// Pause toggle (Esc / gamepad Start). Public for the headless
 	// physics/controls fixture; still locally-controlled only.
+	void OnInventoryChangedForLoad();
 	void OnPausePressed();
 
 	// ---- Quick menu (Part A): compact top-left panel, Canvas-drawn ----
@@ -175,6 +194,35 @@ public:
 	int32 MenuSelectedIndex = 0;
 
 	bool IsQuickMenuOpen() const { return bQuickMenuOpen; }
+	bool IsInventoryOpen() const { return bInventoryOpen; }
+	void ToggleInventory();
+	void OpenInventory();
+	void CloseInventory();
+	void OnInventoryPressed();
+
+	// ---- Inventory UI actions (called from HUD, server-authoritative) ----
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Inventory")
+	void ServerUseInventorySlot(int32 SlotIndex);
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Inventory")
+	void ServerDropInventorySlot(int32 SlotIndex, int32 Count);
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Inventory")
+	void ServerEquipInventorySlot(int32 SlotIndex);
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Inventory")
+	void ServerUnequipInventorySlotByName(FName SlotName);
+
+	// ---- Right arm reach ----
+	UFUNCTION(BlueprintCallable, Category = "Afterfall|Limb")
+	void OnReachPressed();
+	UFUNCTION(BlueprintCallable, Category = "Afterfall|Limb")
+	void OnReachReleased();
+	/** Cast a reach target from the camera into the world and drive the arm. */
+	UFUNCTION(BlueprintCallable, Category = "Afterfall|Limb")
+	void SetReachTargetFromCamera();
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Afterfall|Limb")
+	bool IsRightArmReaching() const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Afterfall|Limb")
+	FAdaptiveLimbPose GetRightArmPose() const;
+
 	bool HealthIsDead() const;
 	void ToggleQuickMenu();
 	void CloseQuickMenu();
@@ -199,6 +247,26 @@ public:
 	float FireIntervalSec = 0.25f;
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Weapon")
 	void ServerReload();
+
+	// ---- Bandage self-treatment (injury/bleeding loop) ----
+	/** Server: begin a bandage treatment session on the priority (first
+	 *  actively-bleeding, else first wounded) body part via the canonical
+	 *  InjuryStateComponent pipeline. Consumes the item on completion. */
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Bleeding")
+	void ServerSelfTreatBandage();
+	/** Server: client-E released -> interrupt any active treatment session. */
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerInterruptSelfTreatment();
+	/** Hold-to-grab a zombie body (RMB): press attaches, release detaches.
+	 *  Routes into the existing ArticulatedBody physics handle; the server
+	 *  re-validates range/facing/ragdoll. Independent of LMB attack state. */
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Interact")
+	void ServerRequestBodyGrab(AActor* Target, bool bGrab);
+	/** Wheel "Craft" on a storage mat (the station the option is offered
+	 *  for): server re-validates range/facing + station context, then runs
+	 *  the transactional, lineage-aware combination on the inventory. */
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Crafting")
+	void ServerCraftCombine(AActor* Target, FGuid TransactionId);
 	/** Immediate respawn while dead (menu button; same path as auto-respawn). */
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Respawn")
 	void ServerRequestRespawn();
@@ -244,9 +312,52 @@ private:
 	UPROPERTY() UInputAction* IA_Reload = nullptr;
 	UPROPERTY() UInputAction* IA_Pause = nullptr;
 	UPROPERTY() UInputAction* IA_Build = nullptr;
-	UPROPERTY() UInputAction* IA_Grapple = nullptr;
+		UPROPERTY() UInputAction* IA_Grapple = nullptr;
+		UPROPERTY() UInputAction* IA_Inventory = nullptr;
+		UPROPERTY() UInputAction* IA_Reach = nullptr;
+		UPROPERTY() UInputAction* IA_GrabHold = nullptr;
+		/** Local-only inventory open flag. Gates movement/look and drives the inventory UI. */
+	// Private member: UHT rejects BlueprintReadOnly on private properties.
+	UPROPERTY()
+	bool bInventoryOpen = false;
 	bool bSprintHeld = false;
+	bool bEKeyHeld = false; // E is the self-treatment modifier (hold with LMB)
 	bool bRespawning = false;
+	// Unified LMB hold-to-choose state (local only; server never trusts it).
+	bool bLMBHeld = false;
+	double LMBHoldStartSec = 0.0;
+	TWeakObjectPtr<AActor> LMBHoldTarget;
+	FVector2D RadialDragAccum = FVector2D::ZeroVector;
+	TWeakObjectPtr<AActor> GrabHoldTarget;
+	FTimerHandle RadialOpenTimer;
+
+	// ---- Mouse-1 arbitration (elapsed seconds, never frame counts) ----
+	/** RMB hold before a world grab commits: 230 ms (spec). */
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
+	float GrabHoldSec = 0.23f;
+	/** Double-click window measured from the previous release. */
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
+	float DoubleClickWindowSec = 0.30f;
+	/** Click-resolution delay: the first click attacks only after this, so a
+	 *  second click inside the window can claim the gesture as a rotation. */
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
+	float ClickResolveDelaySec = 0.28f;
+	/** Weapon-hand rotation speed (deg per unit of mouse delta) while rotating. */
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
+	float WeaponRotationSpeedDeg = 0.24f;
+	/** Pitch clamp for the weapon hand (deg). */
+	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
+	float WeaponPitchClampDeg = 60.f;
+
+	bool bPendingClick = false;     // released, waiting out the resolve delay
+	bool bWeaponRotating = false;   // double-click held: mouse drives the hand
+	double LMBReleaseSec = 0.0;     // previous release, for the double-click window
+	bool bGrabHoldFired = false;    // the 230 ms RMB hold has committed
+	FTimerHandle ClickResolveTimer;
+	FTimerHandle GrabHoldTimer;
+	/** Pivot any weapon/tool mesh attaches to; double-click rotates it. */
+	UPROPERTY(VisibleAnywhere, Category = "Afterfall|Input")
+	USceneComponent* WeaponHandPivot = nullptr;
 
 	void InjectSliceInput();
 	void Move(const FInputActionValue& Value);
@@ -254,7 +365,28 @@ private:
 	void OnSprintStarted();
 	void OnSprintReleased();
 	void OnInteractPressed();
+	void OnInteractReleased();
 	void OnAttackPressed();
+	void OnAttackReleased();
+	void OnGrabHoldPressed();
+	void OnGrabHoldReleased();
+	/** Timer callback: open the wheel once the hold passes the threshold. */
+	void OpenRadialFromHold();
+	/** Release-with-wheel: validate and dispatch the highlighted action. */
+	void ConfirmRadialFromHold();
+	/** Close the wheel with no action (cancel chord, Esc, target loss). */
+	void CancelRadialMenu();
+	/** Quick-click path: the pre-wheel treat-or-swing behavior, unchanged. */
+	void DefaultLMBAction();
+	/** Deferred single click: fires the attack once the resolve delay lapses. */
+	void ResolveSingleClick();
+	/** Timer callback: the RMB hold passed 230 ms -> run the unified grab. */
+	void FireGrabHold();
+	/** Double-click held: route mouse delta into the weapon-hand pivot. */
+	void RotateWeaponHand(const FVector2D& MouseDelta);
+	/** Route one radial choice into its server-authoritative gameplay path. */
+	void ExecuteRadialAction(ERadialAction Action, AActor* Target);
+	bool IsRadialMenuOpen() const;
 	void OnCrouchPressed();
 	void OnThrowPressed();
 	void OnDropPressed();

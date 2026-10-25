@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 1,
+  "note": "Machine-readable mechanic registry. Every entry declares the files, modules, assets and inputs a mechanic needs. Scripts/mechanic_registry.py validates it and reports compile / asset / runtime as SEPARATE states. Nothing here is marked verified unless a log path is present.",
+  "project": "C:/Users/mckee/Desktop/Come Up Game/RealGame.uproject",
+  "mechanics": [
+    {
+      "id": "player-locomotion",
+      "name": "Player locomotion",
+      "sources": [
+        "Source/Afterfall/AfterfallCharacter.cpp",
+        "Source/Afterfall/AfterfallCharacter.h",
+        "Source/Afterfall/Movement/AfterfallMovementComponent.cpp",
+        "Source/Afterfall/Movement/AfterfallMovementComponent.h"
+      ],
+      "modules": [
+        "Engine",
+        "EnhancedInput"
+      ],
+      "actorClass": "AAfterfallCharacter",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [
+        "IA_Move",
+        "IA_Look",
+        "IA_Sprint",
+        "IA_Jump",
+        "IA_Crouch"
+      ],
+      "tags": [
+        "Movement.Walk",
+        "Movement.Sprint"
+      ],
+      "ui": [],
+      "status": {
+        "compile": "PASS",
+        "assets": "NO_SKELETAL_ANIM_REQUIRED",
+        "runtime": "PASS"
+      },
+      "evidence": "PLAYGROUND/MECHTEST world build + slice opponent pursuit runs headless"
+    },
+    {
+      "id": "zombie-pursuit",
+      "name": "Zombie pursuit and attacks",
+      "sources": [
+        "Source/Afterfall/AI/ZombiePrototype.cpp",
+        "Source/Afterfall/AI/ZombiePrototype.h"
+      ],
+      "modules": [
+        "Engine",
+        "AIModule"
+      ],
+      "actorClass": "AZombiePrototype",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [],
+      "tags": [
+        "AI.Chase",
+        "AI.Attack"
+      ],
+      "ui": [],
+      "status": {
+        "compile": "PASS",
+        "assets": "NO_SKELETAL_ANIM_REQUIRED",
+        "runtime": "PASS"
+      },
+      "evidence": "SLICETEST PASS: zombie AI damaged player (bites logged at 1.8m)"
+    },
+    {
+      "id": "zombie-ragdoll",
+      "name": "Zombie ragdoll (articulated death body)",
+      "sources": [
+        "Source/Afterfall/Combat/ArticulatedBodyComponent.cpp",
+        "Source/Afterfall/Combat/ArticulatedBodyComponent.h",
+        "Source/Afterfall/AI/ZombiePrototype.cpp"
+      ],
+      "modules": [
+        "Engine",
+        "PhysicsCore"
+      ],
+      "actorClass": "AZombiePrototype",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [],
+      "tags": [
+        "Body.Articulated",
+        "Body.Ragdoll"
+      ],
+      "ui": [],
+      "status": {
+        "compile": "PASS",
+        "assets": "BLOCKOUT_PARTS_OK",
+        "runtime": "PASS"
+      },
+      "evidence": "RAGDOLL ZombiePrototype: 6 bodies, 5 joints on death"
+    },
+    {
+      "id": "articulated-grab",
+      "name": "Articulated-body grab, drag and release",
+      "sources": [
+        "Source/Afterfall/Combat/ArticulatedBodyComponent.cpp",
+        "Source/Afterfall/Combat/ArticulatedBodyComponent.h",
+        "Source/Afterfall/AI/ZombiePrototype.cpp"
+      ],
+      "modules": [
+        "Engine",
+        "PhysicsCore"
+      ],
+      "actorClass": "AZombiePrototype",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [
+        "IA_Interact"
+      ],
+      "tags": [
+        "Interact.GrabBody"
+      ],
+      "ui": [
+        "prompt: Drag Body (E)"
+      ],
+      "status": {
+        "compile": "PASS",
+        "assets": "NO_SKELETAL_ANIM_REQUIRED",
+        "runtime": "PASS"
+      },
+      "evidence": "SLICETEST PASS: ragdoll grab + release (server physics handle)"
+    },
+    {
+      "id": "injury-treatment",
+      "name": "Injury reactions and bandage treatment",
+      "sources": [
+        "Source/Afterfall/Combat/InjuryStateComponent.cpp",
+        "Source/Afterfall/Combat/InjuryStateComponent.h",
+        "Source/Afterfall/Combat/MedicalCapability.cpp",
+        "Source/Afterfall/Combat/MedicalCapability.h",
+        "Source/Afterfall/UI/AfterfallHUD.cpp"
+      ],
+      "modules": [
+        "Engine"
+      ],
+      "actorClass": "AAfterfallCharacter",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [
+        "IA_Interact",
+        "IA_Attack"
+      ],
+      "tags": [
+        "Injury.Bleeding",
+        "Medical.Bandage"
+      ],
+      "ui": [
+        "HUD BLEEDING n / WOUNDS n / Treating %"
+      ],
+      "status": {
+        "compile": "PASS",
+        "assets": "NO_SKELETAL_ANIM_REQUIRED",
+        "runtime": "PARTIAL"
+      },
+      "evidence": "Automation Afterfall.Medical 3/3; wound seeded by zombie bite; HUD readout not visually checked"
+    },
+    {
+      "id": "breakable-environment",
+      "name": "Breakable environment interaction",
+      "sources": [
+        "Source/Afterfall/Structural/StructuralActor.cpp",
+        "Source/Afterfall/Structural/StructuralActor.h",
+        "Source/Afterfall/Destruction/DestructionPropagation.cpp",
+        "Source/Afterfall/Slice/MechPlaygroundSubsystem.cpp"
+      ],
+      "modules": [
+        "Engine",
+        "ProceduralMeshComponent"
+      ],
+      "actorClass": "AStructuralActor",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [
+        "IA_Attack",
+        "IA_Fire"
+      ],
+      "tags": [
+        "Destruction.Impact",
+        "Destruction.Detach"
+      ],
+      "ui": [],
+      "status": {
+        "compile": "PASS",
+        "assets": "BLOCKOUT_PARTS_OK",
+        "runtime": "PASS"
+      },
+      "evidence": "MECHTEST: wall commit +1 cell dur 90; window commit +1 cell dur 50; PIPELINE 17/17"
+    },
+    {
+      "id": "skeletal-animation",
+      "name": "Skeletal locomotion / attack / hit-reaction animation set",
+      "sources": [],
+      "modules": [
+        "Engine"
+      ],
+      "actorClass": "AAfterfallCharacter",
+      "animations": [
+        "/Game/AF_External/Animations/Player/AM_Locomotion",
+        "/Game/AF_External/Animations/Zombie/AM_ZombieAttack",
+        "/Game/AF_External/Animations/Zombie/AM_ZombieDeath"
+      ],
+      "skeleton": "/Game/AF_External/Characters/SK_Mannequin_Skeleton",
+      "animBlueprint": "/Game/AF_External/Characters/ABP_Afterfall",
+      "physicsAsset": "/Game/AF_External/Characters/PHYS_Mannequin",
+      "inputs": [],
+      "tags": [
+        "Anim.Locomotion",
+        "Anim.Attack",
+        "Anim.Death"
+      ],
+      "ui": [],
+      "status": {
+        "compile": "N_A",
+        "assets": "MISSING",
+        "runtime": "NOT_RUN"
+      },
+      "evidence": "No skeletal mesh, skeleton, physics asset or animation exists in the project or the installed engine; ABP_FP_Copy is also missing"
+    },
+    {
+      "id": "world-generation",
+      "name": "Procedural world: voxel terrain + destructible building shells",
+      "sources": [
+        "Source/Afterfall/World/WorldGen.cpp",
+        "Source/Afterfall/World/WorldGen.h",
+        "Source/Afterfall/Voxel/VoxelChunkActor.cpp",
+        "Source/Afterfall/Structural/StructuralActor.cpp",
+        "Source/Afterfall/Voxel/VoxelChunkActor.cpp"
+      ],
+      "modules": [
+        "Engine",
+        "ProceduralMeshComponent"
+      ],
+      "actorClass": "AVoxelChunkActor",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [],
+      "tags": [
+        "World.Generate",
+        "World.Stream"
+      ],
+      "ui": [],
+      "status": {
+        "compile": "PASS",
+        "assets": "PROCEDURAL_OK",
+        "runtime": "PASS"
+      },
+      "evidence": "WORLDGEN SUMMARY pass=23 fail=0: 1km plan / 160 sites, 8 shells / 680 parts, 16 chunks streamed around the player (multi-focus cap shared), damage persisted to Saved/WorldGen/Chunks_<seed>.afw and restored after a simulated restart"
+    },
+    {
+      "id": "unified-mouse-input",
+      "name": "Unified Mouse-1 wheel + RMB hold-grab with click arbitration",
+      "sources": [
+        "Source/Afterfall/AfterfallCharacter.cpp",
+        "Source/Afterfall/AfterfallCharacter.h",
+        "Source/Afterfall/Interaction/ClickArbitration.h",
+        "Source/Afterfall/UI/RadialMenuComponent.cpp",
+        "Source/Afterfall/UI/RadialMenuComponent.h",
+        "Source/Afterfall/UI/AfterfallHUD.cpp"
+      ],
+      "modules": [
+        "Engine",
+        "EnhancedInput"
+      ],
+      "actorClass": "AAfterfallCharacter",
+      "animations": [],
+      "skeleton": null,
+      "animBlueprint": null,
+      "physicsAsset": null,
+      "inputs": [
+        "IA_Attack (Mouse1)",
+        "IA_GrabHold (Mouse2)"
+      ],
+      "tags": [
+        "Input.Radial",
+        "Input.GrabHold",
+        "Interact.Wheel"
+      ],
+      "ui": [
+        "HUD radial wheel centred on crosshair, DPI-scaled 3 inch"
+      ],
+      "status": {
+        "compile": "PASS",
+        "assets": "NO_ANIM_ASSETS_LEFT_HAND_GRAB_PENDING",
+        "runtime": "PARTIAL"
+      },
+      "evidence": "Automation Afterfall.Interact 5/5 PASS (Radial.Threshold 0.33s, Radial.Sectors east=0, Mouse.WheelThreshold, Mouse.DoublePress, Mouse.GrabThreshold 0.23s), suite 55/0 exit 0; mouse behaviour itself not verified headless - no input device in the harness"
+    }
+  ]
+}

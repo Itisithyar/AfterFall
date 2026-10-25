@@ -4,6 +4,7 @@
 #include "World/ResourceNode.h"
 #include "AI/ZombiePrototype.h"
 #include "Combat/HealthComponent.h"
+#include "Combat/ArticulatedBodyComponent.h"
 #include "Inventory/InventoryComponent.h"
 #include "Interaction/Interactable.h"
 #include "UI/AfterfallHUD.h"
@@ -13,6 +14,7 @@
 #include "Interaction/CarryComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
+#include "Components/DirectionalLightComponent.h"
 #include "GameFramework/WorldSettings.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -76,6 +78,57 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 		Anchor = Start->GetActorLocation();
 	}
 	UE_LOG(LogAfterfall, Log, TEXT("Slice setup at %s"), *Anchor.ToString());
+
+	// Deterministic ground bootstrap. The World Partition level can stream in
+	// nothing (fresh checkout / PIE), leaving the pawn floating in unlit empty
+	// sky. Guarantee a floor + directional sun under the slice room in every
+	// gameplay context; only when nothing solid is beneath the anchor, so maps
+	// with real ground are untouched.
+	{
+		FHitResult Ground;
+		FCollisionQueryParams GroundQ(SCENE_QUERY_STAT(AFGroundBootstrap), false);
+		const FVector From = Anchor + FVector(0.f, 0.f, 200.f);
+		if (!W->LineTraceSingleByChannel(Ground, From, From - FVector(0.f, 0.f, 8000.f),
+			ECC_Visibility, GroundQ))
+		{
+			// Floor slab: 100 cm base cube, 30x30 m, top surface 95 cm below the
+			// anchor (pawn capsule feet). Default cube material stays visibly lit.
+			const float FloorTop = Anchor.Z - 95.f;
+			FActorSpawnParameters P;
+			P.SpawnCollisionHandlingOverride =
+				ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (AStaticMeshActor* Floor = W->SpawnActor<AStaticMeshActor>(
+				AStaticMeshActor::StaticClass(),
+				FTransform(FRotator::ZeroRotator,
+					FVector(Anchor.X, Anchor.Y, FloorTop - 17.5f)), P))
+			{
+				if (UStaticMeshComponent* M = Floor->GetStaticMeshComponent())
+				{
+				if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr,
+						TEXT("/Engine/BasicShapes/Cube.Cube")))
+				{
+					M->SetMobility(EComponentMobility::Movable); // runtime mesh change
+					M->SetStaticMesh(Cube);
+				}
+					M->SetWorldScale3D(FVector(30.f, 30.f, 0.35f));
+					M->SetCollisionProfileName(TEXT("BlockAll"));
+				}
+			}
+			if (AActor* Sun = W->SpawnActor<AActor>(AActor::StaticClass(),
+				FTransform(FRotator(-45.f, 45.f, 0.f), Anchor + FVector(0.f, 0.f, 2000.f)), P))
+			{
+				UDirectionalLightComponent* D =
+					NewObject<UDirectionalLightComponent>(Sun);
+				D->Intensity = 8.f;
+				D->SetWorldRotation(Sun->GetActorRotation());
+				Sun->SetRootComponent(D);
+				D->RegisterComponent();
+			}
+			UE_LOG(LogAfterfall, Log,
+				TEXT("Slice ground bootstrap: floor+sun at %s (no streamed ground)"),
+				*Anchor.ToString());
+		}
+	}
 
 	// Stage B integration (real consumer): resolve the slice anchor to its
 	// voxel lattice cell through the typed service path. The slice must not
@@ -153,25 +206,26 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 		}
 		if (UStaticMeshComponent* M = B->GetStaticMeshComponent())
 		{
+			// Mobility BEFORE the mesh assignment (a Static component warns).
+			M->SetMobility(EComponentMobility::Movable); // runtime mesh change
 			M->UnregisterComponent();
-		if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, MeshPath))
+			if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, MeshPath))
 			{
 				M->SetStaticMesh(Mesh);
 			}
-		M->SetMobility(EComponentMobility::Movable);
-		M->SetWorldScale3D(Scale);
-		M->SetCollisionProfileName(TEXT("PhysicsActor"));
-		M->SetSimulatePhysics(true);
-		M->SetMassOverrideInKg(NAME_None, MassKg, true);
-		if (UPhysicalMaterial* PM = NewObject<UPhysicalMaterial>(B))
-		{
-			PM->Friction = Friction;
-			PM->Restitution = Restitution;
-			M->SetPhysMaterialOverride(PM);
-		}
-		M->RegisterComponent();
-		UE_LOG(LogAfterfall, Log, TEXT("Slice lab block %s (%.0fkg mu=%.2f e=%.2f) at %s"),
-			Name, MassKg, Friction, Restitution, *B->GetActorLocation().ToString());
+			M->SetWorldScale3D(Scale);
+			M->SetCollisionProfileName(TEXT("PhysicsActor"));
+			M->SetSimulatePhysics(true);
+			M->SetMassOverrideInKg(NAME_None, MassKg, true);
+			if (UPhysicalMaterial* PM = NewObject<UPhysicalMaterial>(B))
+			{
+				PM->Friction = Friction;
+				PM->Restitution = Restitution;
+				M->SetPhysMaterialOverride(PM);
+			}
+			M->RegisterComponent();
+			UE_LOG(LogAfterfall, Log, TEXT("Slice lab block %s (%.0fkg mu=%.2f e=%.2f) at %s"),
+				Name, MassKg, Friction, Restitution, *B->GetActorLocation().ToString());
 		}
 	};
 	SpawnLabBlock(TEXT("LabBlock_Concrete"), TEXT("/Engine/BasicShapes/Cube.Cube"),
@@ -245,6 +299,15 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 				}
 			}
 		}
+	}
+
+	// Headless acceptance hook: the same scripted loop the afSliceSelfTest
+	// console command runs, scheduled past setup so it has a possessed pawn.
+	if (FParse::Param(FCommandLine::Get(), TEXT("afSliceSelfTest")))
+	{
+		FTimerHandle SelfTestTimer;
+		W->GetTimerManager().SetTimer(SelfTestTimer, this,
+			&UAfterfallSliceSubsystem::RunSliceSelfTest, 3.0f, false);
 	}
 }
 
@@ -677,6 +740,17 @@ void UAfterfallSliceSubsystem::RunSliceSelfTest()
 		}
 		SliceLog(!Z->IsAlive(), TEXT("six torso hits kill"));
 		SliceLog(Z->GetDamageRecord().bHasRecord && !bHadRecord, TEXT("first hit created record"));
+
+		// Step 4b: articulated body grab/release through the same server-only
+		// interaction path the player uses (E on a ragdoll).
+		const FVector ToBody = (Z->GetActorLocation() - P->GetActorLocation()).GetSafeNormal2D();
+		P->SetActorRotation(ToBody.Rotation());
+		const bool bRagdoll = Z->Body && Z->Body->IsRagdoll();
+		IInteractable::Execute_ServerInteract(Z, PC2);
+		const bool bGrabbed = bRagdoll && Z->Body->IsGrabbed();
+		IInteractable::Execute_ServerInteract(Z, PC2); // release
+		const bool bReleased = bGrabbed && !Z->Body->IsGrabbed();
+		SliceLog(bGrabbed && bReleased, TEXT("ragdoll grab + release"));
 
 		// Step 5: player death -> auto-respawn with full HP.
 		P->Health->ServerTakeDamage(500.f);

@@ -1,0 +1,107 @@
+AFTERFALL FEATURE REGISTRY
+Canonical feature-status source for Afterfall mechanics, systems, and verification.
+
+Owner/reconciliation: BEAM Free. Task database: Docs/TASKS.json (existing, not duplicated).
+Version: 2026-10-25. Source of requirements: recovered design registry + Docs/*.md + source code.
+
+STATUS VOCABULARY (BEAM):
+NOT_IMPLEMENTED | PARTIAL | DISCONNECTED | BLOCKED | UNVERIFIED | IMPLEMENTED_VERIFIED | SUPERSEDED | DESIGN_ONLY
+
+FEATURE REGISTRY ENTRIES (audited 2026-10-25):
+
+1. FR-001 PhysicsTestSubsystem
+   Intended: freefall measurement, impulse, self-exit via -afPhysicsTest.
+   Status: IMPLEMENTED_VERIFIED (runtime log 19:07: dz=502.72 vs ideal 490.5; PhysicsValidation 33/33).
+   Evidence: Source/Afterfall/Physics/*, AfterfallSafetyBackups logs, Tony reports.
+   Next: full-game physics integration runtime; monitor.
+
+2. FR-002 Unified Damage Pipeline
+   Intended: one pipeline for p2p/zombie-zombie/player-zombie/hitscan/melee/explosion/contact.
+   Status: PARTIAL (pure DamageResolver + server-authoritative HealthComponent + zombie RPCs +
+   InteractionEvent dedup present; cross-source wiring + client prediction UNVERIFIED/MISSING).
+   Evidence: Combat/*.h/cpp, AI/ZombiePrototype.
+   Next: map remaining wiring; implement prediction slice.
+
+3. FR-003 Bandage Self-Treatment
+   Intended: equip/draw bandage, E+LMB treat, wound/bleeding update, wound persists, normal controls.
+   Status: COMPILE_PASS via CANONICAL LEDGER. Duplicate BleedingComponent (FLINT slice 1) was
+   REMOVED 2026-10-25 in favor of the existing canonical UInjuryStateComponent +
+   UMedicalCapabilityLib pipeline. Character now owns UInjuryStateComponent subobject; hold-E
+   + LMB -> ServerSelfTreatBandage Stern -> ServerBeginTreatment (first-bleeding else first-
+   wounded part, AF_MED_Bandage); releasing E -> ServerInterruptSelfTreatment (hold-to-treat).
+   Zombie attack -> InjuryState.ServerApplyWound(Torso, severity). Item consumed once at
+   session completion by the canonical path.
+   RUNTIME: NOT RUN (interactive). Automation Afterfall.Medical run observed externally.
+   Evidence: AfterfallCharacter.*, AI/ZombiePrototype.*, Combat/InjuryStateComponent.* (unchanged).
+   Verify (independent, 2026-10-25): AfterfallEditor exit 0; BuildCookRun BUILD SUCCESSFUL exit 0
+   (Desktop\AfterfallStaging_2026-10-24_injury_pkg); Automation Afterfall.Medical 3/3 Success;
+   RUNTIME BLOCKED - packaged launches stall ~2s after slice setup (pre-medical package stalls too);
+   bandage acquisition still unwired. Details: Docs/FR-003-BANDAGE-RUNTIME-REPORT.md.
+
+4. FR-004 Client Prediction / Reconciliation
+   Intended: immediate local response, authoritative verify, dedup, reconcile.
+   Status: DESIGN_ONLY (recovered design; not implemented).
+   Next: design + implement slice.
+
+5. FR-005 Voxel / Procedural Destruction
+   Intended: shader-first R=F(S,L,N); geometry rebuild on shape change; VoxelSurfaceBridge.
+   Status: PARTIAL/UNVERIFIED (Destruction subsystem compiled+tested in fixtures; bridge PROPOSED).
+
+6. FR-006 Movement / Grapple / Carry
+   Status: PARTIAL (movement + grapple compiled; runtime UNVERIFIED; carry implemented+compiled).
+
+7. FR-007 Inventory / Crafting / Loot / Persistence
+   Status: PARTIAL (wallet/crafting/mat green; end-to-end save/load PARTIAL).
+
+8. FR-008 UI / HUD / Quick Menu / Radial
+   Status: UNVERIFIED (compiled; visual runtime human verification MISSING).
+
+9. FR-009 AI / Zombie Combat
+   Status: PARTIAL (prototype combat compiled+fixture-tested; full behavior UNVERIFIED).
+
+10. FR-010 Multiplayer Authority / Replication
+    Status: UNVERIFIED (server-authoritative RPCs present; large-scale multi-client soak NOT done).
+
+11. FR-011 Agent Bridge
+    Status: UNVERIFIED live (automation green; live driver blocked by Zen :8558 contention).
+
+12. FR-012 Build/Package/Launch verification chain
+    Status: COMPILE_PASS (exit 0); COOK/PACKAGE/LAUNCH/RUNTIME — UNVERIFIED / NOT RUN per latest reports.
+
+SUMMARY (2026-10-25):
+- Implemented_verified: FR-001, mat interactions subset.
+- Partial: FR-002, FR-005, FR-006, FR-007, FR-009, FR-012(compile).
+- Compile/package pass, runtime blocked: FR-003 (bandage self-treatment — startup stall + no acquisition path).
+- Design only: FR-004, FR-005(bridge).
+- Unverified: FR-008, FR-010, FR-011, FR-012(package/launch/runtime).
+- Blocked: none newly; dependency gaps noted.
+
+HIGHEST IMPACT GAPS:
+- FR-003 (bandage/treatment) runtime is blocked by a pre-existing startup stall → recovered medical design still unproven.
+- FR-004 (client prediction) missing → blocks responsive combat design.
+- FR-012 package/launch/runtime unverified → trust chain incomplete.
+
+NEXT ACTION SLICES:
+- Slice 1: BleedingComponent + wound/treatment + bandage consume (FR-003 core).
+- Slice 2: client prediction wiring for hits (FR-004).
+- Slice 3: finalize control mapping reconciliation (FR-006/FR-003 E+LMB).
+
+--- 2026-10-25 FLINT additions ---
+13. FR-013 Box-Based Wall Destruction
+    Intended: box structures from modular cubes; default 4 cubes wide on all
+    faces (configurable, corners shared); per-block mass from material density
+    x volume (six graybox materials); localized impact destruction
+    (E = 0.5*m_eff*v_rel^2) with splash, repeated-damage accumulation, and
+    support-loss collapse; integration into the EXISTING server-authoritative
+    destruction/structural/voxel stack (no second framework).
+    Status: COMPILE_PASS + AUTOMATION_PASS (layout/mass/impact tests,
+    Afterfall.BoxBuilding.* 3/3 Success, exit 0; ~17:59-18:03 local session).
+    Also 6/6 Afterfall.Destruction regression tests Success.
+    RUNTIME VISUAL: NOT RUN (no actor/mesh wiring yet - editor work open).
+    Evidence: Source/Afterfall/Structural/BoxBuilding.h/.cpp,
+    Tests/BoxBuildingTest.cpp; UBT log exit 0;
+    Saved/Logs/RealGame.log (automation runs 01:01-01:04 UTC).
+    Next: actor/mesh visualization + routing renders of body impacts through
+    UDestructionPropagationService/StructuralActor (body-impact hook pending).
+
+Agent handoffs: FLINT owns implementation slices; Muse owns build/package/runtime investigation; Kilo authorized for kilo-box-001.
