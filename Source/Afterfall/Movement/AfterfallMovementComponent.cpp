@@ -209,12 +209,30 @@ float UAfterfallMovementComponent::GetMaxSpeed() const
 	return Tuning.NormalMaxSpeed;
 }
 
+FPortableEquation UAfterfallMovementComponent::AccelLoadEquation()
+{
+	return Afterfall::Portable::Linear(-0.15f, 1.f);
+}
+
+FPortableEquation UAfterfallMovementComponent::SpeedLoadEquation()
+{
+	return Afterfall::Portable::Linear(-0.08f, 1.f);
+}
+
+FPortableEquation UAfterfallMovementComponent::BrakeLoadEquation()
+{
+	return Afterfall::Portable::Linear(-0.10f, 1.f);
+}
+
 void UAfterfallMovementComponent::ComputeMovementFactors(float LoadRatio, float& OutAccelFactor, float& OutSpeedFactor, float& OutBrakeFactor)
 {
+	// Single evaluation point for the shared load-response equations:
+	// identical values to the documented 1 - k*L lines (regression-guarded
+	// by Afterfall.Load.Equations.*), now exported through FPortableEquation.
 	const float L = FMath::Clamp(LoadRatio, 0.f, 4.f);
-	OutAccelFactor = FMath::Clamp(1.f - 0.15f * L, 0.3f, 1.f);
-	OutSpeedFactor = FMath::Clamp(1.f - 0.08f * L, 0.5f, 1.f);
-	OutBrakeFactor = FMath::Clamp(1.f - 0.1f * L, 0.4f, 1.f);
+	OutAccelFactor = FMath::Clamp(Afterfall::Portable::Eval(AccelLoadEquation(), L), 0.3f, 1.f);
+	OutSpeedFactor = FMath::Clamp(Afterfall::Portable::Eval(SpeedLoadEquation(), L), 0.5f, 1.f);
+	OutBrakeFactor = FMath::Clamp(Afterfall::Portable::Eval(BrakeLoadEquation(), L), 0.4f, 1.f);
 }
 
 void UAfterfallMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

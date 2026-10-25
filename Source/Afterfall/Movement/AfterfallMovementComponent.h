@@ -6,6 +6,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Math/PortableEquation.h"
 #include "AfterfallMovementComponent.generated.h"
 
 /** Explicit sprint lifecycle. Transitions are simulation-time driven. */
@@ -87,6 +88,15 @@ public:
 	static float ComputeLoadRatio(float TotalMassKg, float ReferenceMassKg);
 	static bool ComputeHeavyHaul(float HeldMassKg, float HeavyThresholdKg);
 	static void ComputeMovementFactors(float LoadRatio, float& OutAccelFactor, float& OutSpeedFactor, float& OutBrakeFactor);
+
+	// Load-response curves as shared portable equations (documented gameplay
+	// approximation, dimensionless): f_a = 1 - 0.15L, f_v = 1 - 0.08L,
+	// f_b = 1 - 0.10L. Same definitions the lab page and external adapters
+	// read via Afterfall::Portable::ToJson; evaluated in exactly one place
+	// (ComputeMovementFactors). y = A*x^2 + B*x + C with A = 0.
+	static FPortableEquation AccelLoadEquation();
+	static FPortableEquation SpeedLoadEquation();
+	static FPortableEquation BrakeLoadEquation();
 
 	/** Telemetry getters. */
 	float GetLoadRatio() const { return LoadRatio; }

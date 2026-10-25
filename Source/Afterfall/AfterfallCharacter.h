@@ -9,6 +9,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Combat/HitPrediction.h"
 #include "Structural/StructuralTypes.h"
 #include "Animation/AdaptiveLimbTypes.h"
 #include "TimerManager.h"
@@ -139,6 +140,18 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Combat")
 	void ServerFireHitscan(const FVector& Direction);
 
+	// FR-004 client prediction + authoritative reconciliation (smallest safe
+	// slice): the client registers a local predicted hit and forwards its
+	// correlation id with the unchanged attack; the server stays the only
+	// damage authority and answers with ClientResolveHitPrediction. HP is
+	// never client-set; only local feedback counters move on reconcile.
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Combat")
+	void ServerAttackWithPrediction(FGuid PredictionId);
+	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Combat")
+	void ServerFireHitscanWithPrediction(const FVector& Direction, FGuid PredictionId);
+	UFUNCTION(Client, Reliable)
+	void ClientResolveHitPrediction(FGuid PredictionId, bool bAuthoritativeHit);
+
 	// Throw the held object: server recomputes release velocity from the
 	// validated direction and the current pawn velocity (no client trust).
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Carry")
@@ -156,6 +169,22 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Combat")
 	int32 ConfirmedHits = 0;
+
+	// FR-004 local prediction feedback counters (display/telemetry only;
+	// authoritative damage still lands exclusively in HealthComponent).
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Combat")
+	int32 PredictedHits = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Combat")
+	int32 AuthoritativeHits = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Combat")
+	int32 ReconciledPredictions = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Afterfall|Combat")
+	int32 RetractedPredictions = 0;
+
+	// Pending client predictions awaiting the authoritative answer.
+	// Local-only: populated by RegisterPredictedHit, drained by the client
+	// reconcile RPC. Bounded by the shared candidate clamp (see header).
+	Afterfall::FHitPredictionLedger PendingPredictions;
 
 	// Client builds preview from Spec table; ghost material only, no spawn.
 	UFUNCTION(BlueprintCallable, Category = "Afterfall|Build")
@@ -383,6 +412,12 @@ private:
 	void CancelRadialMenu();
 	/** Quick-click path: the pre-wheel treat-or-swing behavior, unchanged. */
 	void DefaultLMBAction();
+	/** FR-004: client-local predicted hit. Runs the same camera trace the
+	 *  server will run (melee reach or hitscan range) and registers the
+	 *  expectation in PendingPredictions. Returns the correlation id sent
+	 *  with the attack RPC (invalid when no prediction applies). Local only:
+	 *  never touches HP, damage, or replicated state. */
+	FGuid RegisterPredictedHit(bool bMelee, const FVector& Direction);
 	/** Deferred single click: fires the attack once the resolve delay lapses. */
 	void ResolveSingleClick();
 	/** Timer callback: the RMB hold passed 230 ms -> run the unified grab. */

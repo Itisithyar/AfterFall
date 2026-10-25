@@ -40,8 +40,17 @@ FEATURE REGISTRY ENTRIES (audited 2026-10-25):
 
 4. FR-004 Client Prediction / Reconciliation
    Intended: immediate local response, authoritative verify, dedup, reconcile.
-   Status: DESIGN_ONLY (recovered design; not implemented).
-   Next: design + implement slice.
+   Status: PARTIAL (smallest safe slice implemented 2026-10-25: client-local
+   predicted hit + correlation id on attack/hitscan RPCs, server
+   authoritative reconcile via ClientResolveHitPrediction, HP never
+   client-set; ledger bounded by shared candidate clamp, TTL 2 s,
+   idempotent resolve; Afterfall.Prediction.HitPrediction.* 4/4 Success).
+   Evidence: Source/Afterfall/Combat/HitPrediction.h, AfterfallCharacter.*
+   (ServerAttackWithPrediction / ServerFireHitscanWithPrediction /
+   ClientResolveHitPrediction / RegisterPredictedHit),
+   Source/Afterfall/Tests/HitPredictionTest.cpp.
+   Next: HUD feedback binding for predicted/reconciled/retracted counts;
+   soak in multiplayer PIE (reconcile path UNVERIFIED in live play).
 
 5. FR-005 Voxel / Procedural Destruction
    Intended: shader-first R=F(S,L,N); geometry rebuild on shape change; VoxelSurfaceBridge.
@@ -72,7 +81,8 @@ SUMMARY (2026-10-25):
 - Implemented_verified: FR-001, mat interactions subset.
 - Partial: FR-002, FR-005, FR-006, FR-007, FR-009, FR-012(compile).
 - Compile/package pass, runtime blocked: FR-003 (bandage self-treatment — startup stall + no acquisition path).
-- Design only: FR-004, FR-005(bridge).
+- Design only: FR-005(bridge). FR-004 moved to PARTIAL (prediction slice
+  implemented; live-play reconcile unverified).
 - Unverified: FR-008, FR-010, FR-011, FR-012(package/launch/runtime).
 - Blocked: none newly; dependency gaps noted.
 

@@ -467,7 +467,10 @@ void AAfterfallCharacter::OnFirePressed()
 	if (AController* PC = GetController())
 	{
 		PC->GetPlayerViewPoint(CamLoc, CamRot);
-		ServerFireHitscan(CamRot.Vector());
+		// FR-004: register the local prediction first, then send its id
+		// with the unchanged server-authoritative hitscan.
+		const FVector FireDir = CamRot.Vector();
+		ServerFireHitscanWithPrediction(FireDir, RegisterPredictedHit(false, FireDir));
 	}
 }
 
@@ -550,6 +553,111 @@ void AAfterfallCharacter::ServerFireHitscan_Implementation(const FVector& Direct
 			ConfirmedHits++;
 		}
 	}
+}
+
+bool AAfterfallCharacter::ServerFireHitscanWithPrediction_Validate(const FVector& Direction, FGuid PredictionId)
+{
+	return ServerFireHitscan_Validate(Direction);
+}
+
+void AAfterfallCharacter::ServerFireHitscanWithPrediction_Implementation(const FVector& Direction, FGuid PredictionId)
+{
+	// Thin reconcile wrapper: the existing body stays the single authority
+	// path. ConfirmedHits moves only on authoritative damage branches, so
+	// the before/after delta IS the authoritative answer (whiffs, dry-fire,
+	// rate-gate and dead/mat rejections all leave it unchanged -> false).
+	const int32 BeforeHits = ConfirmedHits;
+	ServerFireHitscan_Implementation(Direction);
+	if (PredictionId.IsValid())
+	{
+		ClientResolveHitPrediction(PredictionId, ConfirmedHits != BeforeHits);
+	}
+}
+
+void AAfterfallCharacter::ClientResolveHitPrediction_Implementation(FGuid PredictionId, bool bAuthoritativeHit)
+{
+	// Reconcile runs client-side only (Client RPC). HP is never touched
+	// here — only the local prediction feedback counters move.
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	switch (PendingPredictions.Resolve(PredictionId, bAuthoritativeHit, Now))
+	{
+	case Afterfall::EHitPredictionOutcome::Confirmed:
+		++AuthoritativeHits;
+		++ReconciledPredictions;
+		break;
+	case Afterfall::EHitPredictionOutcome::Retracted:
+		++RetractedPredictions;
+		if (PredictedHits > 0)
+		{
+			--PredictedHits;
+		}
+		UE_LOG(LogAfterfall, Log, TEXT("Prediction retracted by server (authoritative miss)"));
+		break;
+	case Afterfall::EHitPredictionOutcome::AuthoritativeOnly:
+		++AuthoritativeHits;
+		UE_LOG(LogAfterfall, Log, TEXT("Server-confirmed hit had no local prediction"));
+		break;
+	case Afterfall::EHitPredictionOutcome::AgreedNoEvent:
+		break;
+	case Afterfall::EHitPredictionOutcome::Expired:
+		UE_LOG(LogAfterfall, Log, TEXT("Prediction answer arrived after TTL"));
+		break;
+	case Afterfall::EHitPredictionOutcome::AlreadyResolved:
+		break;
+	case Afterfall::EHitPredictionOutcome::UnknownId:
+	default:
+		UE_LOG(LogAfterfall, Warning, TEXT("Reconcile for unknown prediction id"));
+		break;
+	}
+}
+
+FGuid AAfterfallCharacter::RegisterPredictedHit(bool bMelee, const FVector& Direction)
+{
+	// Client-local prediction: mirror the server's camera trace (melee
+	// reach for swings, 5 m hitscan range for test-fire) and register the
+	// expectation. Damageable set matches the server branches exactly:
+	// zombie + structural for hitscan, plus box wall for melee.
+	if (!IsLocallyControlled() || !GetWorld())
+	{
+		return FGuid();
+	}
+	AController* PC = GetController();
+	if (!PC)
+	{
+		return FGuid();
+	}
+	FVector CamLoc;
+	FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
+	static constexpr float PredictHitscanRangeCm = 5000.f;
+	const FVector End = bMelee
+		? CamLoc + CamRot.Vector() * MeleeRangeCm
+		: CamLoc + Direction.GetSafeNormal() * PredictHitscanRangeCm;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(AFPredictHit), false, this);
+	FHitResult Hit;
+	bool bDamageable = false;
+	FName TargetName = NAME_None;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, CamLoc, End, ECC_Visibility, Params)
+		&& Hit.GetActor())
+	{
+		AActor* HitActor = Hit.GetActor();
+		TargetName = HitActor->GetFName();
+		if (Cast<AZombiePrototype>(HitActor) || Cast<AStructuralActor>(HitActor))
+		{
+			bDamageable = true;
+		}
+		else if (bMelee && Cast<ABoxWallStructure>(HitActor))
+		{
+			bDamageable = true;
+		}
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	const FGuid PredictionId = PendingPredictions.Add(TargetName, bDamageable, Now);
+	if (bDamageable)
+	{
+		++PredictedHits; // immediate local feedback; retracted if the server disagrees
+	}
+	return PredictionId;
 }
 
 bool AAfterfallCharacter::ServerSelfTreatBandage_Validate()
@@ -813,7 +921,9 @@ void AAfterfallCharacter::DefaultLMBAction()
 			ServerSelfTreatBandage();
 			return;
 		}
-		ServerAttack();
+		// FR-004: register the local prediction first, then send its id
+		// with the unchanged server-authoritative melee swing.
+		ServerAttackWithPrediction(RegisterPredictedHit(true, FVector::ZeroVector));
 	}
 }
 
@@ -1816,6 +1926,25 @@ void AAfterfallCharacter::ServerAttack_Implementation()
 		}
 	}
 	AmmoConsumed++;
+}
+
+bool AAfterfallCharacter::ServerAttackWithPrediction_Validate(FGuid PredictionId)
+{
+	return ServerAttack_Validate();
+}
+
+void AAfterfallCharacter::ServerAttackWithPrediction_Implementation(FGuid PredictionId)
+{
+	// Thin reconcile wrapper: the existing body stays the single authority
+	// path. ConfirmedHits moves only on authoritative damage branches, so
+	// the before/after delta IS the authoritative answer (whiffs and dead/
+	// mat rejections leave it unchanged -> false).
+	const int32 BeforeHits = ConfirmedHits;
+	ServerAttack_Implementation();
+	if (PredictionId.IsValid())
+	{
+		ClientResolveHitPrediction(PredictionId, ConfirmedHits != BeforeHits);
+	}
 }
 
 // ---------------------------------------------------------------- Build (unchanged authority paths) ---
