@@ -385,7 +385,7 @@ private:
 	/** Click-resolution delay: the first click attacks only after this, so a
 	 *  second click inside the window can claim the gesture as a rotation. */
 	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
-	float ClickResolveDelaySec = 0.28f;
+	float ClickResolveDelaySec = 0.23f;
 	/** Weapon-hand rotation speed (deg per unit of mouse delta) while rotating. */
 	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Input")
 	float WeaponRotationSpeedDeg = 0.24f;

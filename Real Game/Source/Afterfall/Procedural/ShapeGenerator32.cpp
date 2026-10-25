@@ -20,6 +20,7 @@
 #include "Afterfall.h"
 #include "Net/UnrealNetwork.h"
 #include "Procedural/MarchingCubesTables.h"
+#include "Procedural/ProceduralSdf.h"
 
 namespace
 {
@@ -117,7 +118,7 @@ int32 AShapeGenerator32::EffectiveSeed() const
 
 AfterfallProcedural::FImpactPlan AShapeGenerator32::BuildServerFracturePlan(
 	const FVector& ImpactWorldPosition, const FVector& ImpactVelocityCmPerSec,
-	float MassKg, EMaterialType Material, int32 MaxDepth) const
+	float MassKg, EMaterialType InMaterial, int32 MaxDepth) const
 {
 	AfterfallProcedural::FImpactPlan Empty;
 	if (!HasAuthority() || !FMath::IsFinite(CellSize) || CellSize <= 0.0f
@@ -145,7 +146,7 @@ AfterfallProcedural::FImpactPlan AShapeGenerator32::BuildServerFracturePlan(
 		FMath::Clamp(FMath::RoundToInt(LocalSamplePosition.Y / CellSize + Half), 0, N - 1),
 		FMath::Clamp(FMath::RoundToInt(LocalSamplePosition.Z / CellSize + Half), 0, N - 1));
 	Request.Seed = static_cast<uint32>(EffectiveSeed());
-	Request.Material = Material;
+	Request.Material = InMaterial;
 	Request.MassKg = MassKg;
 	// Unreal rigid-body velocities are centimeters per second; the registered
 	// impact-energy equation is SI, so convert exactly once at this boundary.
@@ -153,58 +154,27 @@ AfterfallProcedural::FImpactPlan AShapeGenerator32::BuildServerFracturePlan(
 	Request.MaxDepth = MaxDepth;
 	return AfterfallProcedural::BuildImpactPlan(Request);
 }
+
 float AShapeGenerator32::EvaluateSDF(const FVector& Q) const
 {
-	// Optional smooth deform applied BEFORE the shape is evaluated.
-	FVector Qp = Q;
-	if (DeformStrength != 0.0f && DeformRadius > 0.0f)
-	{
-		const float DistToCenter = FVector::Dist(Q, Center);
-		const float T = FMath::Clamp(DistToCenter / DeformRadius, 0.0f, 1.0f);
-		const float W = 1.0f - T * T * (3.0f - 2.0f * T); // smoothstep falloff
-		Qp = Q + DeformStrength * W * FVector(1.0f, -1.0f, 0.0f);
-	}
-
-	float F = 0.0f;
-	switch (ShapeType)
-	{
-	case EShapeType32::Sphere:
-		F = Qp.Size() - Radius;
-		break;
-	case EShapeType32::Box:
-	{
-		const FVector A = Qp.GetAbs() - HalfExtents;
-		F = FMath::Max3(A.X, A.Y, A.Z);
-		break;
-	}
-	case EShapeType32::Cylinder:
-	{
-		const float Radial = FVector2D(Qp.X, Qp.Y).Size() - Radius;
-		const float Axial = FMath::Abs(Qp.Z) - Height;
-		F = FMath::Max(Radial, Axial);
-		break;
-	}
-	case EShapeType32::Capsule:
-	{
-		// Segment along Z from -Height to +Height, minus Radius.
-		const float ClampedZ = FMath::Clamp(Qp.Z, -Height, Height);
-		F = FVector::Dist(Qp, FVector(0.0f, 0.0f, ClampedZ)) - Radius;
-		break;
-	}
-	default:
-		F = Qp.Size() - Radius;
-		break;
-	}
-
-	if (NoiseStrength != 0.0f)
-	{
-		// 5.8 PerlinNoise3D takes position only: frequency is fixed at 0.02
-		// (chosen so a 32^3 @ 10uu grid sees a few smooth lumps) and the
-		// seed enters through a deterministic offset (no global RNG state).
-		const FVector SampleP = Q * 0.02f + CachedNoiseOffset;
-		F += NoiseStrength * FMath::PerlinNoise3D(SampleP);
-	}
-	return F;
+	// Shared equations (ProceduralSdf.h): one bounded warp with the legacy
+	// fixed direction, then the primitive, then deterministic noise.
+	// Numerically identical to the previous inline implementation.
+	AfterfallSdf::FSdfParams P;
+	P.Shape = ShapeType;
+	P.HalfExtents = HalfExtents;
+	P.Radius = Radius;
+	P.Height = Height;
+	P.NoiseStrength = NoiseStrength;
+	P.NoiseOffset = CachedNoiseOffset;
+	AfterfallSdf::FWarpOp W;
+	W.Center = Center;
+	W.Direction = FVector(1.0f, -1.0f, 0.0f);
+	W.Radius = DeformRadius;
+	W.Strength = DeformStrength;
+	TArray<AfterfallSdf::FWarpOp> Warps;
+	Warps.Add(W);
+	return AfterfallSdf::EvalField(P, Q, Warps);
 }
 
 namespace

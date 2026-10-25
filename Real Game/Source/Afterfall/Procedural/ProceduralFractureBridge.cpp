@@ -1,6 +1,6 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
 #include "Procedural/ProceduralFractureBridge.h"
-#include "Math/AfterfallEquations.h"
+#include "Impact/AfterfallImpact.h"
 
 namespace AfterfallProcedural
 {
@@ -17,8 +17,7 @@ namespace AfterfallProcedural
 		}
 
 		const double SpeedMps = Request.ImpactVelocityMps.Size();
-		const double EnergyJ = Request.MassKg
-			* Afterfall::Eval(Afterfall::ImpactEnergy, SpeedMps);
+		const double EnergyJ = Afterfall::KineticEnergyJ(Request.MassKg, SpeedMps);
 		if (!std::isfinite(EnergyJ) || EnergyJ <= 0.0
 			|| EnergyJ > static_cast<double>(MAX_flt))
 		{

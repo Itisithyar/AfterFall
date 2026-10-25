@@ -21,6 +21,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/BoxComponent.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "TimerManager.h"
 #include "HAL/IConsoleManager.h"
@@ -78,6 +79,10 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 		Anchor = Start->GetActorLocation();
 	}
 	UE_LOG(LogAfterfall, Log, TEXT("Slice setup at %s"), *Anchor.ToString());
+	const bool bEnableSliceTestFixtures = FParse::Param(FCommandLine::Get(), TEXT("afPipelineSelfTest"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("afSliceSelfTest"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("afPhysicsLab"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("afSliceShowcase"));
 
 	// Deterministic ground bootstrap. The World Partition level can stream in
 	// nothing (fresh checkout / PIE), leaving the pawn floating in unlit empty
@@ -91,8 +96,8 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 		if (!W->LineTraceSingleByChannel(Ground, From, From - FVector(0.f, 0.f, 8000.f),
 			ECC_Visibility, GroundQ))
 		{
-			// Floor slab: 100 cm base cube, 30x30 m, top surface 95 cm below the
-			// anchor (pawn capsule feet). Default cube material stays visibly lit.
+			// Small flat engine plane is only a fallback if the GameMode's large
+			// startup floor is unavailable; keep the cube collider invisible.
 			const float FloorTop = Anchor.Z - 95.f;
 			FActorSpawnParameters P;
 			P.SpawnCollisionHandlingOverride =
@@ -100,18 +105,24 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 			if (AStaticMeshActor* Floor = W->SpawnActor<AStaticMeshActor>(
 				AStaticMeshActor::StaticClass(),
 				FTransform(FRotator::ZeroRotator,
-					FVector(Anchor.X, Anchor.Y, FloorTop - 17.5f)), P))
+					FVector(Anchor.X, Anchor.Y, FloorTop)), P))
 			{
 				if (UStaticMeshComponent* M = Floor->GetStaticMeshComponent())
 				{
-				if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr,
-						TEXT("/Engine/BasicShapes/Cube.Cube")))
+				if (UStaticMesh* Plane = LoadObject<UStaticMesh>(nullptr,
+						TEXT("/Engine/BasicShapes/Plane.Plane")))
 				{
-					M->SetMobility(EComponentMobility::Movable); // runtime mesh change
-					M->SetStaticMesh(Cube);
+					M->SetMobility(EComponentMobility::Movable);
+					M->SetStaticMesh(Plane);
 				}
-					M->SetWorldScale3D(FVector(30.f, 30.f, 0.35f));
-					M->SetCollisionProfileName(TEXT("BlockAll"));
+					M->SetWorldScale3D(FVector(30.f, 30.f, 1.f));
+					M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					UBoxComponent* FloorCollision = NewObject<UBoxComponent>(Floor, TEXT("SliceFloorCollision"));
+					FloorCollision->SetupAttachment(M);
+					FloorCollision->SetRelativeLocation(FVector(0.f, 0.f, -10.f));
+					FloorCollision->SetBoxExtent(FVector(1500.f, 1500.f, 10.f));
+					FloorCollision->SetCollisionProfileName(TEXT("BlockAll"));
+					FloorCollision->RegisterComponent();
 				}
 			}
 			if (AActor* Sun = W->SpawnActor<AActor>(AActor::StaticClass(),
@@ -165,9 +176,12 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 				*N->GetActorLocation().ToString());
 		}
 	};
-	SpawnNode(EResourceKind::Wood, FVector(400.f, 0.f, 100.f));
-	SpawnNode(EResourceKind::Stone, FVector(0.f, 400.f, 100.f));
-	SpawnNode(EResourceKind::Hemp, FVector(-400.f, 0.f, 100.f));
+	if (bEnableSliceTestFixtures)
+	{
+		SpawnNode(EResourceKind::Wood, FVector(400.f, 0.f, 100.f));
+		SpawnNode(EResourceKind::Stone, FVector(0.f, 400.f, 100.f));
+		SpawnNode(EResourceKind::Hemp, FVector(-400.f, 0.f, 100.f));
+	}
 
 	// Playable lab: exactly three independently simulated zombies at
 	// distinct, safe offsets (no shared mutable AI/movement state).
@@ -184,9 +198,12 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 				*Z->GetActorLocation().ToString());
 		}
 	};
-	SpawnZombie(FVector(1500.f, 0.f, 100.f));
-	SpawnZombie(FVector(1200.f, 900.f, 100.f));
-	SpawnZombie(FVector(1200.f, -900.f, 100.f));
+	if (bEnableSliceTestFixtures)
+	{
+		SpawnZombie(FVector(1500.f, 0.f, 100.f));
+		SpawnZombie(FVector(1200.f, 900.f, 100.f));
+		SpawnZombie(FVector(1200.f, -900.f, 100.f));
+	}
 
 	// Playable physics-test blocks: distinct materials/masses/friction.
 	// Graybox rigid bodies (no destruction claims); the destruction system
@@ -228,14 +245,17 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 				Name, MassKg, Friction, Restitution, *B->GetActorLocation().ToString());
 		}
 	};
-	SpawnLabBlock(TEXT("LabBlock_Concrete"), TEXT("/Engine/BasicShapes/Cube.Cube"),
-		FVector(900.f, 300.f, 100.f), FVector(1.f, 1.f, 1.f), 50.f, 0.9f, 0.1f);
-	SpawnLabBlock(TEXT("LabBlock_Metal"), TEXT("/Engine/BasicShapes/Cube.Cube"),
-		FVector(900.f, -300.f, 100.f), FVector(0.8f, 0.8f, 0.8f), 80.f, 0.4f, 0.3f);
-	SpawnLabBlock(TEXT("LabBlock_WoodCrate"), TEXT("/Engine/BasicShapes/Cube.Cube"),
-		FVector(1100.f, 0.f, 100.f), FVector(0.6f, 0.6f, 0.6f), 10.f, 0.7f, 0.2f);
-	SpawnLabBlock(TEXT("LabBlock_Cylinder"), TEXT("/Engine/BasicShapes/Cylinder.Cylinder"),
-		FVector(1300.f, 300.f, 100.f), FVector(0.5f, 0.5f, 1.f), 15.f, 0.5f, 0.25f);
+	if (bEnableSliceTestFixtures)
+	{
+		SpawnLabBlock(TEXT("LabBlock_Concrete"), TEXT("/Engine/BasicShapes/Cube.Cube"),
+			FVector(900.f, 300.f, 100.f), FVector(1.f, 1.f, 1.f), 50.f, 0.9f, 0.1f);
+		SpawnLabBlock(TEXT("LabBlock_Metal"), TEXT("/Engine/BasicShapes/Cube.Cube"),
+			FVector(900.f, -300.f, 100.f), FVector(0.8f, 0.8f, 0.8f), 80.f, 0.4f, 0.3f);
+		SpawnLabBlock(TEXT("LabBlock_WoodCrate"), TEXT("/Engine/BasicShapes/Cube.Cube"),
+			FVector(1100.f, 0.f, 100.f), FVector(0.6f, 0.6f, 0.6f), 10.f, 0.7f, 0.2f);
+		SpawnLabBlock(TEXT("LabBlock_Cylinder"), TEXT("/Engine/BasicShapes/Cylinder.Cylinder"),
+			FVector(1300.f, 300.f, 100.f), FVector(0.5f, 0.5f, 1.f), 15.f, 0.5f, 0.25f);
+	}
 
 	// Stage 2 graybox: one light + one heavy throwable near the anchor.
 	auto SpawnItem = [&](FName Type, float Mass, FVector Offset)
@@ -253,13 +273,17 @@ void UAfterfallSliceSubsystem::DoSliceSetup()
 				*Type.ToString(), Mass, *I->GetActorLocation().ToString());
 		}
 	};
-	SpawnItem(TEXT("AF_R_Scrap"), 2.f, FVector(600.f, 200.f, 150.f));
-	SpawnItem(TEXT("AF_R_Stone"), 12.f, FVector(700.f, -200.f, 150.f));
+	if (bEnableSliceTestFixtures)
+	{
+		SpawnItem(TEXT("AF_R_Scrap"), 2.f, FVector(600.f, 200.f, 150.f));
+		SpawnItem(TEXT("AF_R_Stone"), 12.f, FVector(700.f, -200.f, 150.f));
+	}
 
 	// Runtime structural seed. AStructuralActor is only created by placement,
 	// and nothing bound placement input, so the destruction pipeline had no
 	// geometry to act on in play. These two parts go through the same
 	// production spawn path as placement (ServerInitialize + damage visuals).
+	if (bEnableSliceTestFixtures)
 	{
 		const FVector WallAt = Anchor + FVector(-700.f, 0.f, 0.f);
 		SpawnStructuralPart(EStructuralPart::Foundation, WallAt + FVector(0.f, 0.f, -25.f),

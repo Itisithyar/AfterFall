@@ -198,10 +198,10 @@ void AAfterfallCharacter::InjectSliceInput()
 		MapKey(SliceIMC, IA_Look, EKeys::MouseY, false, true, true);
 		MapKey(SliceIMC, IA_Jump, EKeys::SpaceBar);
 		MapKey(SliceIMC, IA_Sprint, EKeys::LeftShift);
-		MapKey(SliceIMC, IA_Interact, EKeys::E);
+		MapKey(SliceIMC, IA_Interact, EKeys::E); // Pickup / regular focused interaction.
 		MapKey(SliceIMC, IA_Attack, EKeys::LeftMouseButton);
 		MapKey(SliceIMC, IA_Crouch, EKeys::C);
-		MapKey(SliceIMC, IA_Throw, EKeys::Q);
+		MapKey(SliceIMC, IA_Throw, EKeys::Q); // Throw held item.
 		MapKey(SliceIMC, IA_Drop, EKeys::G);
 		MapKey(SliceIMC, IA_Mat, EKeys::B);
 		MapKey(SliceIMC, IA_Fire, EKeys::F);
@@ -212,7 +212,7 @@ void AAfterfallCharacter::InjectSliceInput()
 		MapKey(SliceIMC, IA_Grapple, EKeys::Gamepad_DPad_Right);
 		MapKey(SliceIMC, IA_Inventory, EKeys::Tab);
 		MapKey(SliceIMC, IA_Inventory, EKeys::Gamepad_DPad_Left);
-		MapKey(SliceIMC, IA_GrabHold, EKeys::RightMouseButton);
+		MapKey(SliceIMC, IA_GrabHold, EKeys::RightMouseButton); // Hold to grab/release.
 		MapKey(SliceIMC, IA_Reach, EKeys::LeftAlt);
 		MapKey(SliceIMC, IA_GrabHold, EKeys::Gamepad_LeftTrigger);
 		MapKey(SliceIMC, IA_Reach, EKeys::Gamepad_LeftShoulder);
@@ -942,7 +942,20 @@ void AAfterfallCharacter::ResolveSingleClick()
 	}
 	bPendingClick = false;
 	LMBReleaseSec = 0.0;
-	DefaultLMBAction(); // the swing: same gate as before the arbitration
+	// A normal Mouse-1 click performs the focused interaction (including item
+	// pickup). If there is no interactable target, preserve the melee fallback.
+	if (bEKeyHeld)
+	{
+		DefaultLMBAction(); // preserve the E+Mouse-1 treatment chord
+	}
+	else if (Interact && Interact->FocusedActor.IsValid())
+	{
+		ServerInteractRequest(Interact->FocusedActor.Get());
+	}
+	else
+	{
+		DefaultLMBAction();
+	}
 }
 
 void AAfterfallCharacter::RotateWeaponHand(const FVector2D& MouseDelta)

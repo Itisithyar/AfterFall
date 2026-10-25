@@ -40,6 +40,7 @@ AActor* AAfterfallGameMode::ChoosePlayerStart_Implementation(AController* Player
 
 void AAfterfallGameMode::BeginPlay()
 {
+	SuppressTemplateCubeGraybox();
 	SpawnPlayableFloor();
 	SpawnProceduralShowcase();
 	GetWorldTimerManager().SetTimerForNextTick(this, &AAfterfallGameMode::ConfigureMorningLighting);
@@ -52,6 +53,50 @@ void AAfterfallGameMode::BeginPlay()
 			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 			W->SpawnActor<AProceduralTerrain>(AProceduralTerrain::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, P);
 		}
+	}
+}
+
+void AAfterfallGameMode::SuppressTemplateCubeGraybox()
+{
+	UWorld* W = GetWorld();
+	if (!W || W->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+	int32 HiddenCubeActors = 0;
+	for (TActorIterator<AActor> It(W); It; ++It)
+	{
+		const FString ActorName = It->GetName();
+		const FString ClassName = It->GetClass() ? It->GetClass()->GetName() : FString();
+		if (ActorName.Contains(TEXT("BP_DiamondSquare"), ESearchCase::IgnoreCase)
+			|| ClassName.Contains(TEXT("BP_DiamondSquare"), ESearchCase::IgnoreCase))
+		{
+			It->SetActorHiddenInGame(true);
+			It->SetActorEnableCollision(false);
+			It->SetActorTickEnabled(false);
+			UE_LOG(LogAfterfall, Log, TEXT("Disabled template cube generator %s; procedural AFTERFALL terrain owns the ground"),
+				*ActorName);
+		}
+	}
+	for (TActorIterator<AStaticMeshActor> It(W); It; ++It)
+	{
+		if (It->GetName().Contains(TEXT("FLOOR_SpawnSafePlatform"), ESearchCase::IgnoreCase))
+		{
+			continue; // the floor placeholder is reused as hidden collision below the terrain
+		}
+		UStaticMeshComponent* Mesh = It->GetStaticMeshComponent();
+		UStaticMesh* Asset = Mesh ? Mesh->GetStaticMesh() : nullptr;
+		if (Asset && Asset->GetName().Equals(TEXT("Cube"), ESearchCase::IgnoreCase))
+		{
+			Mesh->SetVisibility(false, true);
+			Mesh->SetHiddenInGame(true, true);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			++HiddenCubeActors;
+		}
+	}
+	if (HiddenCubeActors > 0)
+	{
+		UE_LOG(LogAfterfall, Log, TEXT("Removed %d template cube actors from the playable view"), HiddenCubeActors);
 	}
 }
 
@@ -187,7 +232,7 @@ void AAfterfallGameMode::SpawnProceduralShowcase()
 		Terrain->TileCountX = 200;
 		Terrain->TileCountY = 200;
 		Terrain->TileSize = 1000.f; // 10 m samples across a 2 km square
-		Terrain->HeightScale = 900.f;
+		Terrain->HeightScale = 60.f; // nearly flat walking surface, with seeded mathematical relief beyond the spawn apron
 		Terrain->RandomSeed = RegionSeed;
 		Terrain->bFlatMode = false;
 		Terrain->FinishSpawning(TerrainTransform);
@@ -208,7 +253,7 @@ void AAfterfallGameMode::SpawnProceduralShowcase()
 	};
 	const FShowcaseSpec Specs[] = {
 		{ EShapeType32::Sphere, EMaterialType::Stone, FVector(500.f, 250.f, 10.f), 105.f, FVector(105.f), 100.f, 11 },
-		{ EShapeType32::Box, EMaterialType::Concrete, FVector(650.f, -350.f, 15.f), 90.f, FVector(90.f, 90.f, 110.f), 110.f, 23 },
+		{ EShapeType32::Capsule, EMaterialType::Concrete, FVector(650.f, -350.f, 15.f), 90.f, FVector(90.f), 110.f, 23 },
 		{ EShapeType32::Cylinder, EMaterialType::Metal, FVector(-500.f, 300.f, 35.f), 75.f, FVector(75.f), 130.f, 37 }
 	};
 	const int32 SpecCount = static_cast<int32>(UE_ARRAY_COUNT(Specs));
@@ -298,10 +343,10 @@ void AAfterfallGameMode::ConfigureMorningLighting()
 	}
 	if (Sky)
 	{
-		Sky->SetMobility(EComponentMobility::Movable);
 		Sky->SetReplicates(true);
 		if (USkyLightComponent* SkyComponent = Sky->GetLightComponent())
 		{
+			SkyComponent->SetMobility(EComponentMobility::Movable);
 			SkyComponent->SetIntensity(0.7f);
 			SkyComponent->RecaptureSky();
 		}

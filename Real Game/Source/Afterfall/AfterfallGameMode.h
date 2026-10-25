@@ -26,6 +26,7 @@ protected:
 	bool bSpawnTestTerrain = false;
 
 private:
+	void SuppressTemplateCubeGraybox();
 	void SpawnPlayableFloor();
 	void SpawnProceduralShowcase();
 	void ConfigureMorningLighting();

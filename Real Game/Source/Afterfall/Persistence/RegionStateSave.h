@@ -115,6 +115,42 @@ struct FZombieDamageDelta
 };
 
 USTRUCT(BlueprintType)
+struct FProceduralObjectDelta
+{
+	GENERATED_BODY()
+	/** Stable object identity across edits, fragments, save/load. */
+	UPROPERTY() FGuid ObjectId;
+	UPROPERTY() FString RegionKey;
+	UPROPERTY() int32 SchemaVersion = 1;
+	/** Compact generation parameters (regen source; never vertex data). */
+	UPROPERTY() FString ShapeName;
+	UPROPERTY() int32 GridSize = 32;
+	UPROPERTY() float CellSize = 10.0f;
+	UPROPERTY() FVector Center = FVector::ZeroVector;
+	UPROPERTY() float Radius = 120.0f;
+	UPROPERTY() FVector HalfExtents = FVector(60.0f, 60.0f, 60.0f);
+	UPROPERTY() float Height = 60.0f;
+	UPROPERTY() float NoiseStrength = 0.0f;
+	UPROPERTY() int32 Seed = 1337;
+	UPROPERTY() float IsoLevel = 0.0f;
+	UPROPERTY() int32 SurfaceMode = 0;
+	UPROPERTY() int32 MaterialProfile = 3;
+	UPROPERTY() int32 FractureMaxDepth = 8;
+	UPROPERTY() int32 FractureCellCap = 512;
+	UPROPERTY() int32 CollisionMode = 0;
+	/** Ordered deform ops as "OpId,Seq,Cx,Cy,Cz,Dx,Dy,Dz,Radius,Strength". */
+	UPROPERTY() TArray<FString> DeformOps;
+	/** Ordered fracture events as "EventId,Seq,Lx,Ly,Lz,Dx,Dy,Dz,EnergyJ,Material,Seed,bInitiated". */
+	UPROPERTY() TArray<FString> FractureEvents;
+	UPROPERTY() FVector_NetQuantize Location = FVector::ZeroVector;
+	UPROPERTY() FRotator Rotation = FRotator::ZeroRotator;
+	UPROPERTY() float Durability = 100.f;
+	UPROPERTY() bool bDestroyed = false;
+	/** Bounded recent event ids (cap 8) for replay protection. */
+	UPROPERTY() TArray<FGuid> RecentEventIds;
+};
+
+USTRUCT(BlueprintType)
 struct FRegionStateSave
 {
 	GENERATED_BODY()
@@ -129,4 +165,5 @@ struct FRegionStateSave
 	UPROPERTY() TArray<FVehicleDelta> Vehicles;
 	UPROPERTY() TArray<FClaimDelta> Claims;
 	UPROPERTY() TArray<FZombieDamageDelta> Zombies; // Only damaged zombies get individual records
+	UPROPERTY() TArray<FProceduralObjectDelta> ProcObjects;
 };

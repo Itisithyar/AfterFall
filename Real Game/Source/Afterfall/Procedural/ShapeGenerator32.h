@@ -121,7 +121,7 @@ public:
 	void GenerateShape32();
 
 	/** Build an authoritative fracture plan from a world impact. The result is a lattice plan; geometry mutation remains with the owning voxel/SDF implementation. */
-	AfterfallProcedural::FImpactPlan BuildServerFracturePlan(const FVector& ImpactWorldPosition, const FVector& ImpactVelocityCmPerSec, float MassKg, EMaterialType Material, int32 MaxDepth = 8) const;
+	AfterfallProcedural::FImpactPlan BuildServerFracturePlan(const FVector& ImpactWorldPosition, const FVector& ImpactVelocityCmPerSec, float MassKg, EMaterialType InMaterial, int32 MaxDepth = 8) const;
 
 	/** Last build stats (not replicated; local diagnostics only). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shape32")

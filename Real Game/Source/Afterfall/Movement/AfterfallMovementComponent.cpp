@@ -1,5 +1,6 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
 #include "AfterfallMovementComponent.h"
+#include "Math/MovementEquations.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/Engine.h"
 
@@ -211,17 +212,17 @@ float UAfterfallMovementComponent::GetMaxSpeed() const
 
 FPortableEquation UAfterfallMovementComponent::AccelLoadEquation()
 {
-	return Afterfall::Portable::Linear(-0.15f, 1.f);
+	return AfterfallMovementEquations::AccelerationFromLoad();
 }
 
 FPortableEquation UAfterfallMovementComponent::SpeedLoadEquation()
 {
-	return Afterfall::Portable::Linear(-0.08f, 1.f);
+	return AfterfallMovementEquations::SpeedFromLoad();
 }
 
 FPortableEquation UAfterfallMovementComponent::BrakeLoadEquation()
 {
-	return Afterfall::Portable::Linear(-0.10f, 1.f);
+	return AfterfallMovementEquations::BrakingFromLoad();
 }
 
 void UAfterfallMovementComponent::ComputeMovementFactors(float LoadRatio, float& OutAccelFactor, float& OutSpeedFactor, float& OutBrakeFactor)
