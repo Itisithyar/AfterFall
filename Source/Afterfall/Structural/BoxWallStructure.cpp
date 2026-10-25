@@ -198,18 +198,26 @@ int32 ABoxWallStructure::ServerApplyBoxImpact(const FVector& WorldImpactPoint,
 		return 0;
 	}
 	// Event-level dedupe (bounded ledger), same discipline as StructuralActor.
+	bool bSkipped = false;
 	for (const FGuid& G : RecentEventIds)
 	{
 		if (G == EventId)
 		{
-			return 0;
+			bSkipped = true;
+			break;
 		}
+	}
+	if (bSkipped)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[IMPACT-DEDUP] guid=%s result=SKIPPED"), *EventId.ToString());
+		return 0;
 	}
 	RecentEventIds.Add(EventId);
 	while (RecentEventIds.Num() > 8)
 	{
 		RecentEventIds.RemoveAt(0);
 	}
+	UE_LOG(LogTemp, Log, TEXT("[IMPACT-DEDUP] guid=%s result=APPLIED"), *EventId.ToString());
 
 	// World -> local (frame rule matches DestructionPropagation service docs).
 	const FTransform Inv = GetActorTransform().Inverse();
@@ -304,7 +312,10 @@ void ABoxWallStructure::OnBlockHit(UPrimitiveComponent* /*HitComp*/,
 	FBoxImpactInput In;
 	In.EffectiveMassKg = MassKg * ThrownBodyEnergyScale;
 	In.RelativeSpeedCmS = SpeedCmS;
-	ServerApplyBoxImpact(Hit.ImpactPoint, VelOther.GetSafeNormal(), In, FGuid::NewGuid());
+	const FGuid EventId = FGuid::NewGuid();
+	UE_LOG(LogTemp, Log, TEXT("[IMPACT] frame=%llu time=%f wall=%s other=%s guid=%s speed_cms=%f energy_J=%f"),
+		(unsigned long long)GFrameCounter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f, *GetName(), OtherActor ? *OtherActor->GetName() : TEXT("None"), *EventId.ToString(), SpeedCmS, 0.5f * (MassKg * ThrownBodyEnergyScale) * FMath::Square(SpeedCmS / 100.f));
+	ServerApplyBoxImpact(Hit.ImpactPoint, VelOther.GetSafeNormal(), In, EventId);
 }
 
 void ABoxWallStructure::MulticastSpawnDebrisEcho_Implementation(int32 BlockId, float MassKg,
