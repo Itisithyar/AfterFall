@@ -13,6 +13,19 @@ void UAfterfallEquationRegistry::Initialize(FSubsystemCollectionBase& Collection
 	AddEq(TEXT("RhombusVerts"), 0, 0, 4);
 	AddEq(TEXT("RhombusEuler"), 0, 0, 1);
 	AddEq(TEXT("RhombusSideError"), 0.0225f, 0, 0);
+	AddEq(TEXT("ImpactEnergy"), 0.5f, 0, 0);
+	AddEq(TEXT("ImpactSpeedSqFromFall"), 0, 2*9.81f, 0);
+	AddEq(TEXT("DebrisHeight"), -9.81f/2.f, 0, 0);
+	AddEq(TEXT("DebrisVelocity"), 0, -9.81f, 0);
+	AddEq(TEXT("NormalizedDamage"), 0, 1, 0);
+	AddEq(TEXT("VoxelMass"), 0, 1.0f, 0);
+	AddEq(TEXT("EnergyBudget"), 0, -1.0f, 100.0f);
+	AddEq(TEXT("JointDamage"), 0.01667f, 0, 0);
+	AddEq(TEXT("GrabSpringForce"), 0, 50.0f, 0);
+	AddEq(TEXT("RopeStretchError"), 0, 1, -1.0f);
+	AddEq(TEXT("RopeTension"), 0, 200.0f, 0);
+	AddEq(TEXT("BloodRemaining"), 0, -10.0f, 5000.0f);
+	AddEq(TEXT("PositionIntegration"), 0, 1, 0);
 }
 
 FAfterfallEquation UAfterfallEquationRegistry::GetEquation(FName ID) const
