@@ -19,4 +19,19 @@ public:
 	// Replicated to clients via GameState in later milestone (Phase 4).
 	UPROPERTY(EditDefaultsOnly, Category = "Afterfall|Region")
 	int32 RegionSeed = 1337;
+
+protected:
+	UPROPERTY(EditAnywhere, Category="Afterfall|Test")
+	bool bSpawnTestBuilding = false;
+
+private:
+	/**
+	 * kilo-box-001 (authorized 2026-10-24): exactly ONE small, light,
+	 * pickable box near the player start — and only on Lvl_FirstPerson.
+	 * Purely runtime: the map asset, config and every other map are
+	 * untouched. Guarded so a server session can never spawn a second one.
+	 */
+	void SpawnAuthorizedTestBox();
+
+	bool bSpawnedTestBox = false;
 };

@@ -2,59 +2,10 @@
 #include "AfterfallGameMode.h"
 #include "Afterfall.h"
 #include "AfterfallCharacter.h"
-#include "Engine/DirectionalLight.h"
-#include "Engine/SkyLight.h"
-#include "Components/SkyLightComponent.h"
-#include "Components/SkyAtmosphereComponent.h"
-#include "Engine/PostProcessVolume.h"
-#include "EngineUtils.h"
-
-static TAutoConsoleVariable<int32> CVarAutoLight(TEXT("af.AutoLight"), 1, TEXT("Auto light fallback"), ECVF_Default);
-
-void AAfterfallGameMode::BeginPlay()
-{
-	Super::BeginPlay();
-	if (CVarAutoLight.GetValueOnGameThread() == 0) return;
-	UWorld* W = GetWorld();
-	if (!W) return;
-	bool bHasDir=false, bHasSky=false, bHasAtm=false, bHasPP=false;
-	for (TActorIterator<ADirectionalLight> It(W); It; ++It) { bHasDir=true; break; }
-	for (TActorIterator<ASkyLight> It(W); It; ++It) { bHasSky=true; break; }
-	for (TActorIterator<AActor> It(W); It; ++It) { if (It->FindComponentByClass<USkyAtmosphereComponent>()) { bHasAtm=true; break; } }
-	for (TActorIterator<APostProcessVolume> It(W); It; ++It) { if (It->bUnbound) { bHasPP=true; break; } }
-	if (!bHasDir)
-	{
-		ADirectionalLight* L = W->SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator(-50.f,0.f,0.f));
-		L->SetMobility(EComponentMobility::Movable);
-		UE_LOG(LogAfterfall, Log, TEXT("AutoLight: spawned DirectionalLight"));
-	}
-	else UE_LOG(LogAfterfall, Log, TEXT("AutoLight: DirectionalLight already present"));
-	if (!bHasSky)
-	{
-		ASkyLight* S = W->SpawnActor<ASkyLight>(FVector::ZeroVector, FRotator::ZeroRotator);
-		S->GetLightComponent()->RecaptureSky();
-		UE_LOG(LogAfterfall, Log, TEXT("AutoLight: spawned SkyLight"));
-	}
-	else UE_LOG(LogAfterfall, Log, TEXT("AutoLight: SkyLight already present"));
-	if (!bHasAtm)
-	{
-		AActor* A = W->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator);
-		A->AddComponentByClass(USkyAtmosphereComponent::StaticClass(), false, FTransform::Identity, false);
-		UE_LOG(LogAfterfall, Log, TEXT("AutoLight: spawned SkyAtmosphere"));
-	}
-	else UE_LOG(LogAfterfall, Log, TEXT("AutoLight: SkyAtmosphere already present"));
-	if (!bHasPP)
-	{
-		APostProcessVolume* P = W->SpawnActor<APostProcessVolume>(FVector::ZeroVector, FRotator::ZeroRotator);
-		P->bUnbound = true;
-		P->Settings.bOverride_AutoExposureMinBrightness = true;
-		P->Settings.bOverride_AutoExposureMaxBrightness = true;
-		P->Settings.AutoExposureMinBrightness = 1.f;
-		P->Settings.AutoExposureMaxBrightness = 1.f;
-		UE_LOG(LogAfterfall, Log, TEXT("AutoLight: spawned PostProcessVolume"));
-	}
-	else UE_LOG(LogAfterfall, Log, TEXT("AutoLight: PostProcessVolume already present"));
-}
+#include "World/PhysicalItem.h"
+#include "GameFramework/PlayerStart.h"
+#include "Kismet/GameplayStatics.h"
+#include "Building/ProceduralBuilding.h"
 
 AAfterfallGameMode::AAfterfallGameMode()
 {
@@ -68,4 +19,80 @@ AAfterfallGameMode::AAfterfallGameMode()
 	// Dedicated server is authoritative: bUseSeamlessTravel left default for now.
 	UE_LOG(LogAfterfall, Log, TEXT("AfterfallGameMode created (Seed=%d) defaultPawn=%s"),
 		RegionSeed, DefaultPawnClass ? *DefaultPawnClass->GetName() : TEXT("null"));
+}
+
+void AAfterfallGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	SpawnAuthorizedTestBox();
+	if (bSpawnTestBuilding)
+	{
+		UWorld* W = GetWorld();
+		if (W)
+		{
+			FActorSpawnParameters P;
+			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+			AProceduralBuilding* B = W->SpawnActor<AProceduralBuilding>(AProceduralBuilding::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, P);
+			if (B) UE_LOG(LogAfterfall, Log, TEXT("Spawned test procedural building"));
+		}
+	}
+}
+
+void AAfterfallGameMode::SpawnAuthorizedTestBox()
+{
+	// Server only — a client GameMode never exists, but guard anyway.
+	UWorld* W = GetWorld();
+	if (!W || W->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+	// Exactly once per session.
+	if (bSpawnedTestBox)
+	{
+		return;
+	}
+	// Authorized scope: ONE map only. Every other map is untouched, so this
+	// cannot leak a stray prop into future levels.
+	const FString MapName = W->GetMapName();
+	if (!MapName.Contains(TEXT("Lvl_FirstPerson")))
+	{
+		return;
+	}
+	bSpawnedTestBox = true;
+
+	// Beside the player start so it is visible and walkable-to immediately;
+	// 50 cm above the floor, then the spawn adjust finds the surface.
+	const APlayerStart* Start = Cast<APlayerStart>(
+		UGameplayStatics::GetActorOfClass(W, APlayerStart::StaticClass()));
+	const FVector Anchor = Start ? Start->GetActorLocation() : FVector::ZeroVector;
+	const FVector SpawnAt = Anchor + FVector(120.f, 80.f, 50.f);
+
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	APhysicalItem* Box = W->SpawnActor<APhysicalItem>(APhysicalItem::StaticClass(),
+		SpawnAt, FRotator::ZeroRotator, P);
+	if (!Box)
+	{
+		UE_LOG(LogAfterfall, Warning, TEXT("kilo-box-001: test box spawn FAILED at %s"),
+			*SpawnAt.ToString());
+		return;
+	}
+
+	// Light by spec (~2-5 kg): full throw speed, no heavy-carry cap, so the
+	// load-to-movement path is exercised without tripping the heavy threshold.
+	Box->ItemType = TEXT("AF_R_Scrap");
+	Box->MassKg = 3.f;
+	Box->ItemId = FGuid::NewGuid();
+	// Keep the simulated body in step with the gameplay mass: the ctor already
+	// applied the DEFAULT MassKg, so re-assert it after the assignment above.
+	// (Load accounting reads MassKg directly; physics must agree with it.)
+	if (UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(Box->GetRootComponent()))
+	{
+		Body->SetMassOverrideInKg(NAME_None, Box->MassKg, true);
+	}
+
+	UE_LOG(LogAfterfall, Log, TEXT("kilo-box-001: one test box at %s (%.1f kg, item %s)"),
+		*Box->GetActorLocation().ToString(), Box->MassKg, *Box->ItemId.ToString());
 }

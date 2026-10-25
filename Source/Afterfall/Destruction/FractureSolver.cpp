@@ -1,8 +1,6 @@
 #include "Destruction/FractureSolver.h"
 #include "Voxel/VoxelBasis.h"
 #include "Structural/BoxBuilding.h"
-#include "Math/AfterfallMath.h"
-#include "Math/PortableEquation.h"
 #include "Prediction/BoundedPredictiveMatrix.h"
 
 namespace AfterfallFracture
@@ -41,14 +39,6 @@ namespace AfterfallFracture
 		// Single tunable severity instance. Defaults are the documented
 		// contract (E_ref = 1000 J, K = 100, D_thr = 64 -> x* = 0.8).
 		FFractureSeverityResponse GSeverityResponse;
-
-		// D(x) = K*x^2 exported as the SAME portable quadratic definition the
-		// lab page, the automation tests and the Unity adapter read. One
-		// definition per equation (repo rule), evaluated in ONE place.
-		FPortableEquation PortableSeverity(const FFractureSeverityResponse& R)
-		{
-			return Afterfall::Portable::MakeQuadratic(R.K);
-		}
 	}
 
 	const FFractureSeverityResponse& GetSeverityResponse()
@@ -115,26 +105,13 @@ namespace AfterfallFracture
 	float SeverityD(const FFractureSeverityResponse& R, float EnergyJ)
 	{
 		const float X = FMath::Max(0.f, EnergyJ) / FMath::Max(1.f, R.ReferenceEnergyJ);
-		return Afterfall::Portable::Eval(PortableSeverity(R), X);
+		return R.K * X * X;
 	}
 
 	float InitiationSeverityX(const FFractureSeverityResponse& R)
 	{
-		// D(x) = D_thr  ->  K*x^2 - D_thr = 0, solved by the SHARED quadratic
-		// solver (Math/AfterfallMath.h). x is a non-negative impact magnitude
-		// by definition, so only a non-negative root is accepted.
-		const Afterfall::Math::FQuadraticResult Sol =
-			Afterfall::Math::SolveQuadratic(R.K, 0.f, -R.InitiationThreshold);
-		for (int32 i = 0; i < Sol.Count; ++i)
-		{
-			if (Sol.Roots[i] >= 0.f && FMath::IsFinite(Sol.Roots[i]))
-			{
-				return Sol.Roots[i];
-			}
-		}
-		// Degenerate tuning (the x^2 term vanishes, |K| below the solver's
-		// zero threshold): keep the documented sqrt form so a near-zero gain
-		// still resolves instead of wedging the gate at 0.
+		// D(x) = D_thr  ->  x = sqrt(D_thr / K), positive root only:
+		// x is a non-negative impact magnitude by definition.
 		return FMath::Sqrt(FMath::Max(0.f, R.InitiationThreshold) / FMath::Max(KINDA_SMALL_NUMBER, R.K));
 	}
 

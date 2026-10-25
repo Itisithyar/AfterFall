@@ -155,7 +155,7 @@ bool UArticulatedBodyComponent::ServerGrab(AController* InGrabber)
 	Handle->SetLinearDamping(200.f);
 	Handle->SetAngularDamping(500.f);
 	Handle->SetInterpolationSpeed(20.f);
-	Handle->LinearStiffness = MaxGrabForce;
+	Handle->LinearStiffness = GrabLinearStiffness;
 	Handle->GrabComponentAtLocationWithRotation(Torso, NAME_None, TorsoLoc, Torso->GetComponentRotation());
 	if (!Handle->GrabbedComponent)
 	{
@@ -204,17 +204,31 @@ void UArticulatedBodyComponent::UpdateGrabTarget()
 		ReleaseHandle();
 		return;
 	}
+	UPrimitiveComponent* Held = Handle->GetGrabbedComponent();
+	if (!Held)
+	{
+		ReleaseHandle();
+		return;
+	}
 	FVector CamLoc;
 	FRotator CamRot;
 	C->GetPlayerViewPoint(CamLoc, CamRot);
 	const FVector Target = CamLoc + CamRot.Vector() * HoldDistanceCm;
 	// Drop the body rather than stretch it across the map if the holder runs.
-	if (FVector::Dist(CamLoc, Handle->GetGrabbedComponent()->GetComponentLocation()) > GrabRangeCm * 1.6f)
+	if (FVector::Dist(CamLoc, Held->GetComponentLocation()) > GrabRangeCm * 1.6f)
 	{
 		ReleaseHandle();
 		return;
 	}
-	Handle->SetTargetLocationAndRotation(Target, CamRot);
+
+	// REAL FORCE CAP: the handle's spring is F = k * |error|, so clamping the
+	// hand-to-target error to MaxGrabForce / k bounds the force at MaxGrabForce
+	// (Newtons) regardless of how far the body lags behind the hand.
+	const FVector Error = Target - Held->GetComponentLocation();
+	const float Stiffness = FMath::Max(GrabLinearStiffness, KINDA_SMALL_NUMBER);
+	const float MaxErrorCm = FMath::Max(0.f, MaxGrabForce) / Stiffness;
+	const FVector CappedTarget = Held->GetComponentLocation() + Error.GetClampedToMaxSize(MaxErrorCm);
+	Handle->SetTargetLocationAndRotation(CappedTarget, CamRot);
 }
 
 void UArticulatedBodyComponent::TickComponent(float DeltaTime, ELevelTick TickType,

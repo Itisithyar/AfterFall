@@ -13,6 +13,6 @@ bool FAfterfallMathQuadratic::RunTest(const FString& P)
 	TestTrue(TEXT("eval"), FMath::IsNearlyEqual(EvalQuadratic(1,2,3,2),11.f));
 	TestTrue(TEXT("deriv"), FMath::IsNearlyEqual(Derivative(1,2,3),8.f));
 	TestTrue(TEXT("vertex"), FMath::IsNearlyEqual(VertexX(1,4),-2.f));
-	TestTrue(TEXT("unity roundtrip"), ToUnreal(ToUnity(FVector(1,2,3))) == FVector(1,2,3));
+	TestTrue(TEXT("unity roundtrip"), Afterfall::Math::ToUnreal(Afterfall::Math::ToUnity(FVector(1,2,3))) == FVector(1,2,3));
 	return true;
 }

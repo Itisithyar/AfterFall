@@ -64,7 +64,20 @@ private:
 
 	bool bRagdoll = false;
 	bool bGrabbed = false;
-	/** Max force (N) applied through the grab handle. */
+
+	/**
+	 * Spring stiffness of the grab handle (N/cm) — this is a STIFFNESS, not a
+	 * force. It feeds UPhysicsHandleComponent::LinearStiffness directly.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Afterfall|Grab")
+	float GrabLinearStiffness = 2000.f;
+
+	/**
+	 * REAL force cap (N) for the grab spring. The physics handle produces
+	 * F = k * |hand-to-target error|, so the error fed to the handle is clamped
+	 * to MaxGrabForce / GrabLinearStiffness in UpdateGrabTarget(); that makes
+	 * |F| <= MaxGrabForce by construction instead of growing with distance.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Afterfall|Grab")
 	float MaxGrabForce = 2000.f;
 
