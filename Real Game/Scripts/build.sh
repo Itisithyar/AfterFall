@@ -7,23 +7,25 @@ UE_ROOT="/c/Program Files/Epic Games/UE_5.8"
 UBT="$UE_ROOT/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe"
 UAT="$UE_ROOT/Engine/Build/BatchFiles/RunUAT.sh"
 
-bash Scripts/check_prereqs.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+bash "$SCRIPT_DIR/check_prereqs.sh"
 
 build_editor() {
   echo ">> Building editor (AfterfallEditor Win64 Development) ..."
-  "$UBT" AfterfallEditor Win64 Development -Project="$PWD/RealGame.uproject" -WaitMutex -FromMsBuild
+  "$UBT" AfterfallEditor Win64 Development -Project="$SCRIPT_DIR/../RealGame.uproject" -WaitMutex -FromMsBuild
 }
 
 build_client() {
   echo ">> Packaging Windows client (Shipping) ..."
-  bash "$UAT" BuildCookRun -project="$PWD/RealGame.uproject" -platform=Win64 -clientconfig=Shipping -build -cook -pak -stage -archive -archivedirectory="$PWD/Build/WindowsClient"
+  bash "$UAT" BuildCookRun -project="$SCRIPT_DIR/../RealGame.uproject" -platform=Win64 -clientconfig=Shipping -build -cook -pak -stage -archive -archivedirectory="$SCRIPT_DIR/../Build/WindowsClient"
 }
 
 build_server() {
   echo ">> Building dedicated server (Win64 Shipping) ..."
-  "$UBT" AfterfallServer Win64 Shipping -Project="$PWD/RealGame.uproject" -WaitMutex -FromMsBuild
+  "$UBT" AfterfallServer Win64 Shipping -Project="$SCRIPT_DIR/../RealGame.uproject" -WaitMutex -FromMsBuild
   echo ">> Packaging server ..."
-  bash "$UAT" BuildCookRun -project="$PWD/RealGame.uproject" -platform=Win64 -serverconfig=Shipping -server -cook -pak -stage -archive -archivedirectory="$PWD/Build/WindowsServer" -serverplatform=Win64 -noclient
+  bash "$UAT" BuildCookRun -project="$SCRIPT_DIR/../RealGame.uproject" -platform=Win64 -serverconfig=Shipping -server -cook -pak -stage -archive -archivedirectory="$SCRIPT_DIR/../Build/WindowsServer" -serverplatform=Win64 -noclient
 }
 
 case "$MODE" in
