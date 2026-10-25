@@ -1,0 +1,113 @@
+AFTERFALL MASTER MECHANICS AND IMPLEMENTATION INVENTORY
+Canonical location: C:\Users\mckee\Desktop\Come Up Game\Docs\AFTERFALL_MASTER_MECHANICS_AND_IMPLEMENTATION_INVENTORY.txt
+Owner/reconciliation: BEAM Free (this file). Game source owner: Muse. Do not edit game source to update this file.
+Phase 1 medical (2026-10-24 ~19:40, BEAM, user-approved scope): NEW files Combat/MedicalCapability.h/.cpp (capability table: bandage/bandage-alias/kit/pills/antiseptic/antibiotic; pure matchers), Combat/InjuryStateComponent.h/.cpp (replicated 6-part wound/bleed/pain/stabilize records, server treatment sessions with duplicate protection, bleed drain via public HealthComponent API, PendingHPRestore for Phase 2 heal hook), Tests/MedicalTreatmentTest.cpp (3 suites: transitions/capabilities/math+guards). Status: COMPILED (exit-0 module build incl. UHT; one UHT fix applied: struct members cannot carry Replicated). Test EXECUTION blocked by concurrent agent editor session (reparent_bp_gamemode.py, PID 23568) — NOT rerun per stop conditions; labeled UNEXECUTED, not passing.
+UPDATE 2026-10-24 ~19:50 (GLM arg-fix session): argument error resolved — root cause was shell quoting layers (bash/powershell) mangling the .uproject positional arg plus concurrent-editor contention, NOT a missing project (exact 'first parameter' string appears in no log). Fix: .bat launchers with aftestrun-style quoting (run_medical_tests.bat, run_bodyphysics_tests.bat in the 19-15-04 backup dir). All 3 medical suites now TESTED PASS (engine log, exit 0). One test-expectation bug found+fixed by the run itself (Complete->Treating re-treat). Mannequin foundation NEW files: Combat/BodyRegionPhysics.h/.cpp (6-region mass/grab/impulse/glass-break profiles, EBodyPart-keyed, BodyPart.* tag order; mass shares sum to 1.0 — one arithmetic fix 0.43->0.50 torso) + Tests/BodyRegionPhysicsTest.cpp (Table+Math suites). Status: COMPILED (exit-0 build) + TESTED PASS 2/2 (exit 0). Skeletal meshes/PhysicsAssets: MISSING from Content (only FP template + prototyping statics) — art pass explicitly deferred, no assets fabricated.
+Version: 2026-10-25 ~00:20. Reconciled with the recovered Afterfall Master Mechanics & Systems Registry (user/Muse conversation, ~2026-10-24). Design-derived items recorded as DESIGN_ONLY/PROPOSED; implementation claims remain sourced only from exit-0 builds / prior reports.
+Note: Feature status tracking now canonicalized in Docs/AFTERFALL_FEATURE_REGISTRY.txt (extends this master; task DB: Docs/TASKS.json).
+
+A. PROJECT IDENTITY AND SOURCE OF TRUTH
+- Authoritative .uproject: C:\Users\mckee\Desktop\Come Up Game\RealGame.uproject (module Afterfall, UE 5.8, "authoritative integration target").
+- Active source root: C:\Users\mckee\Desktop\Come Up Game\Source\Afterfall — 120 .h/.cpp files, 20 subsystem dirs. COMPILE VERIFIED (full AfterfallEditor build exit 0, 2026-10-24 19:04; repaired-script rebuild exit 0, 19:1x).
+- Engine: C:\Program Files\Epic Games\UE_5.8. Build target: AfterfallEditor, Win64 Development.
+- Packages: Come Up Game\AfterfallStaging\ (user 18:53, preserved) + Desktop\AfterfallStaging_2026-10-24_pkg\ (verified 19:06, exit 0).
+- Safety backups: Desktop\AfterfallSafetyBackups\ (2026-10-24_19-04-09 verified; 2026-10-24_19-15-04 P1 repair).
+- Stale/dormant (do not build): Real Game\Afterfall.uproject (different project, same module name); 4 module-less template .uproject copies.
+- Prior session work (MechPlayground, grapple port) is COMMITTED in the active tree (not modified in working tree).
+
+B. STATUS VOCABULARY (used below)
+DISCUSSED | DESIGNED | PARTIAL | IMPLEMENTED (code complete, unexecuted) | COMPILED (in exit-0 module build) | TESTED (automation/fixture PASS) | RUNTIME (executed in live game, log evidence) | MULTIPLAYER (net-mode verified) | COMPLETE (all applicable above) | MISSING | BLOCKED
+- Recovered-design additions applied this pass: DESIGN_ONLY (design recovered, no implementation evidence in inspected source), PROPOSED (equation/model recovered from discussion, not executed), DESIGN_ONLY for behavior requirements, DESIGN_ONLY for multiplayer design.
+
+C. MECHANICS INVENTORY (per subsystem; every item below is COMPILED via the exit-0 module build)
+1. Physics (Physics/) — RUNTIME: PhysicsTestSubsystem (spawn cube, simulate, freefall dz=502.72 vs ideal 490.5, impulse, self-exit; launch log 19:07 PROVES run). TESTED: PhysicsValidationSubsystem (prior 33/33 + PHYTEST evidence per Tony reports). Status: COMPLETE for the test fixture; full-game physics integration RUNTIME-only where exercised.
+2. Movement (Movement/) — AfterfallMovementComponent (CMC subclass: sprint state machine, 120 Hz fixed-step, 89.4 cm/s heavy-carry cap). AfterfallGrappleComponent (server-authoritative port; owner-CMC velocity only; momentum preserved): IMPLEMENTED+COMPILED, RUNTIME in-game UNVERIFIED. Prior headless grapple math checks per Tony reports.
+3. Character (root) — AfterfallCharacter (FP pawn, code-built SliceIMC incl. IA_Grapple T + gamepad, ServerRequestGrapple/ServerReleaseGrapple RPCs), AfterfallGameMode (RegionSeed=1337). IMPLEMENTED+COMPILED; in-game (PIE) UNVERIFIED this session.
+4. Combat (Combat/) — HealthComponent (server HP 0-200, death latch, revive), DamageResolver + BodyDamageTypes, InteractionEvent. COMPILED; zombie damage pipeline TESTED per prior automation.
+
+RECOVERED DESIGN REGISTRY ITEMS THIS PASS (DESIGN_ONLY / PROPOSED — not claims of implementation):
+1. Unified damage pipeline (DESIGN_ONLY): all relevant sources (Player→Player, Zombie→Zombie, Player→Zombie, Zombie→Player, projectile/hitscan, melee, explosions/environmental, physical contact) connect to a common system: hit identification, damage evaluation, outcome handling, verification. Implementation evidence in inspected active source: NOT_FOUND beyond test/damage internals; status DESIGN_ONLY until mapped.
+2. Connected damage and physical consequences (DESIGN_ONLY): damage may affect health/death, impulse/physical reaction, localized structural damage, destruction/debris, blood/feedback, collision changes. Status: DESIGN_ONLY.
+3. Localized impact and destruction (DESIGN_ONLY): impact location matters; falloff, material resistance, geometry, structural connectivity considered. Status: DESIGN_ONLY.
+4. Client-first multiplayer design (DESIGN_ONLY): local contact/fire → predicted simulation → independent authoritative verification → reconciliation; event IDs for duplicate prevention; visual vs confirmed state separation; sync destruction/collision; ordering/latency policy UNRESOLVED (fair "first on client" rule needs explicit policy). Status: DESIGN_ONLY; implementation not found in inspected source.
+5. Voxel/procedural destruction — Option A (DESIGN_ONLY): shader-first rendering, geometry rebuilt when physical shape changes; VoxelSurfaceBridge concept. Status: PROPOSED model; not matched to executable code.
+
+D. EQUATIONS AND MODELS (cited, not invented; recovered equations marked PROPOSED)
+- Freefall: dz = Start.Z - End.Z vs ideal 490.5 cm (1 s freefall) — PhysicsTestSubsystem.cpp; RUNTIME measured 502.72.
+- Throw release: v_player + dir * speed, inheritance factor, MaxThrowSpeed clamp — CarryComponent/APhysicalItem (per prior session reports; not re-read this session — IMPLEMENTED+COMPILED, formula text secondhand).
+- Heavy-carry cap 89.4 cm/s at mass >= 5 kg; sprint 5 s budget + 3 s recovery — MovementComponent (same provenance caveat).
+- Grapple rope constraint: radial-velocity projection + swept correction, 1500 cm/s swing clamp — AfterfallGrappleComponent.cpp (read in prior session; COMPILED here).
+- Destruction: energy - materialCost*cm - breakpointCost over 3x3x3 lattice; idempotent commit; event ledger cap 8 — DestructionPropagation (prior audit; COMPILED here).
+
+RECOVERED EQUATIONS (PROPOSED / DESIGN, from user registry, 2026-10-24):
+- Frame budget: T_frame = 1000/FPS; T_frame ≈ 8.333 ms at 120 FPS (simulation+render+overhead).
+- Kinetic energy: E_k = 1/2 m v^2; example 8 g @ 800 m/s → E_k = 2560 J.
+- Proposed gameplay damage model: D = E_k * eta_transfer * K_material * K_geometry * K_location (tunable; multipliers/calibration UNRESOLVED; not a universal law).
+- Momentum/impulse/force: p = m v; J = Δp; J = F Δt; F = m a.
+- Projectile trajectory: x = x0 + vx t; y = y0 + vy t − 1/2 g t^2 (constant gravity, no drag).
+- Health: H_new = max(0, H − D).
+- Voxel mass: m_cell = ρ h^3 (h = voxel side; halving h → 8× cells).
+- Localized damage falloff: w(d) = (1 − d/r)^p, 0 ≤ d ≤ r; clamp to 0 outside radius.
+- Structural stress: σ = F/A; σ = E ε.
+
+5. RECOVERED DESIGN EQUATIONS FROM USER REGISTRY (DESIGN_ONLY):
+- Voxel state: S_i = (M_i, ρ_i, D_i, φ_i); Rendering: R_i = F(S_i, L_i, N_i); Normalized damage: D_i = clamp(d_i / d_max, 0, 1); Adaptive detail: ΔL = L_max − L_min; R = f(ΔL, C, D, E).
+
+6. DATA FLOW (verified paths)
+- Input -> character RPCs -> server authority -> damage -> ServerApplyImpact -> propagation -> commit -> replication -> ISMC rebuild -> ExportDelta/ImportDelta (pipeline TESTED 17/17 per prior reports).
+- Death -> HandleDeath -> DoRespawn; menu Respawn converges (same path).
+- Harvest -> ServerAddItem -> wallet; zombie damage -> record -> loot corpse table.
+
+7. F. MULTIPLAYER — server-authoritative RPCs throughout; room server/client-verify fixtures exist (afRoomServer/afRoomClientVerify/afRoomLiveClient). Full multi-client soak: TESTED fixtures only; large-scale MULTIPLAYER UNVERIFIED.
+
+8. G. MISSING (confirmed, not fabricated)
+- kilo-box-001: AUTHORIZED to Kilo (TASKS.json), GameMode files contain zero box references — NOT IMPLEMENTED, correctly untouched.
+- TestNeighborhood map: MISSING (only Lvl_FirstPerson). launch_2client_server.sh defaults to it (arg-overridable).
+- Character anims: template anims quarantined, no working anims. Audio: zero sound assets. Checkpoints/game-over/win: none. Disk save/load end-to-end: unproven. Gamepad: bindings exist, human verification MISSING.
+
+9. H. TEST ACCEPTANCE (from TASKS.json + prior reports)
+- kilo-box-001: 1 box on Lvl_FirstPerson, map hash unchanged, diff limited to 2 GameMode files, build+automation+room green. Status: pending Kilo.
+- muse-physics-001 (Kilo, claimed): gravity/collision/impulse/friction — SUPERSEDED IN PART by 19:07 RUNTIME PASS of the physics fixture (freefall+impulse logged); remaining items per its acceptance as written.
+
+RECOVERED ACCEPTANCE TESTS FROM USER REGISTRY (PROPOSED; NOT RUN BY BEAM):
+1. Fire and observe immediate local feedback without waiting for a server round trip.
+2. Verify authoritative result; ensure same damage is not applied twice.
+3. Test two shots arriving close together; establish deterministic resolution rule.
+4. Two clients observe same destruction; verify consistent final geometry/collision.
+5. Projectile hitting destructible object; verify physical consequence and collision.
+6. Player-to-player and zombie-to-zombie damage through connected pipeline.
+7. Latency and rejected predictions; corrections must not leave permanent incorrect state.
+8. Physics test repeated; compare results against explicit tolerances.
+9. Grapple and interaction controls in running game.
+10. Persistence across save/load/world-restoration where required.
+
+10. J. DEPENDENCY MAP, K. OPEN DECISIONS, L. METHODOLOGY/PROVENANCE — unchanged from prior inventory.
+
+N. CHANGE HISTORY
+- 2026-10-25 ~00:20: Reconciled recovered Afterfall Master Mechanics & Systems Registry into this file. Design-derived mechanics/equations/tests recorded as DESIGN_ONLY/PROPOSED; no implementation claims fabricated. Prior statuses retained.
+
+Status vocabulary and baseline requirements from the task prompt should also be recorded here.
+
+## 11. CONSOLIDATED LISTING — RECOVERED DESIGN DOCUMENT (2026-10-25)
+Recovered Afterfall master mechanics/equations/registry content, consolidated listing:
+- Core mechanics: client-first combat; connected damage/destruction; unified interaction pipeline; localized geometric destruction; physics-connected consequences; independent simulation/verification.
+- Equations: frame budget T_frame=1000/FPS (120 FPS→8.33 ms); T_game=T_comb+T_phys+T_destr+T_AI+T_other; E_k=½mv² (2560 J example); D=E_k·η·K_material·K_geometry·K_location; p=mv; J=Δp; F=ma; a=F/m; v_t+Δt=v_t+aΔt; x_t+Δt=x_t+vΔt+½aΔt²; τ=Iα; trajectory eqs; H_new=max(0,H−D); D_acc=ΣD_i; D_acc≥D_critical⇒failure.
+- Destruction: V_i=(M_i,ρ_i,D_i,x_i,S_i); V_cell=h³; m_cell=ρh³; x_local=T_world⁻¹x_world; falloff w(d)=(1−d/r)^p; D_i=D_impact·w(d_i); triangle area A=½∥(b−a)×(c−a)∥; G=(V,E); Connected(v,support).
+- Combat: E=(ID,t,A,B,x,n,v,type,material); ID-seen dedup; D_final=D_base·K_loc·K_armor·K_state; propagation D_j(k+1)=D_j(k)+Σw_ij·D_i(k); explosion D(r)=D_max·f(r).
+- Networking: S_pred=F(S_local,E); S_auth=F(S_auth,prev,E_valid); ΔS=S_auth−S_pred; ΔH=H_auth−H_pred; lifecycle Created→Predicted→Validated→Committed; E=(ID,t_client,t_server,sequence); T_response≈T_local vs ≈T_RTT+T_server+T_local final.
+- Established vs open: coherent design defined; shared pipeline design-only; prediction design-only; voxel path proposed; physics laws established, coefficients pending; multiplayer not yet demonstrated.
+
+## 12. ITEM CATALOG / LOOT / STORAGE / REFRESH + VOXEL SURFACE BRIDGE (RECOVERED 2026-10-25)
+
+- Item-list architecture: central item catalog (wood_basic etc.; display name, icon, stack limits, weight, properties; stacking/consumption/crafting/transfer rules) + runtime instances (inventory, storage, world pickup, loot generation). Physical world instances get unique instance IDs + location/physics/quantity; definition shared, instance unique.
+- Loot→catalog: loot table (possible item IDs, quantities, probabilities, conditions) → generation algorithm → generated loot instance; persistent container state records remaining quantities (e.g., take 10 of 15 → saved state 5; reopen loads 5, not re-roll).
+- Refresh system: distinguish what refreshes (catalog / UI / loot table config / container state / world loot / temp cache). Critical rule: refreshing display ≠ regenerating underlying data. Cache refresh must not restore consumed loot.
+- Storage: stationary (box: stable identity + saved stacks); portable (backpack: instance-owned contents); interactive furniture (stove: fuel/ingredients/output; craft consumes → adds output). Shared inventory/persistence infrastructure, distinct behavior.
+- Destruction↔inventory: projectile destroys wooden crate → destruction updates structure; inventory decides contents outcome; loot resolves drops; persistence records world state. Need explicit ownership/transition rules (who owns crate inventory before destruction; when ownership ends; which items transfer to world pickups; how transfer+destruction commit to avoid reload duplication).
+- VoxelSurfaceBridge: engine-independent module translating voxel physics/damage → rendering data. S_i=(M_i,ρ_i,D_i,ϕ_i); R_i=F(S_i,L_i,N_i); D_i=clamp(d_i/d_max,0,1); Option A default (shader lighting/material, no new triangles from light); geometry path rebuilds mesh/collision when shape changes.
+- Adaptive detail: ΔL=L_max−L_min; subdivide if ΔL>τ; R=f(ΔL,C,D,E). Shader handles complex lighting without new geometry; subdivision reserved for genuine geometry needs.
+- Crash context: light-hit voxel → extra line/triangles; caveat: normal voxel face often already 2 triangles via GPU triangulation; shader-only default; geometry subdivision only for actual shape change.
+
+N. CHANGE HISTORY
+- 2026-10-25 ~00:20: Reconciled recovered Afterfall Master Mechanics & Systems Registry (user/Muse conversation, ~2026-10-24). Design-derived mechanics/equations/tests recorded as DESIGN_ONLY/PROPOSED; no implementation claims fabricated. Prior statuses retained.
+- 2026-10-25 ~00:30: Consolidated recovered design listing (mechanics, equations, checklist, tests, established-vs-open) appended to this master.

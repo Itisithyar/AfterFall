@@ -1,0 +1,13 @@
+AFTERFALL SOURCE AUDIT (BEAM Free, 2026-10-24 ~19:20; supersedes 19:13 stub)
+Scope: active tree C:\Users\mckee\Desktop\Come Up Game\Source\Afterfall (120 .h/.cpp, 20 dirs) + root module files + Build.cs + targets + Docs + reports. Read-only except the approved P1 script repair (separate backup/diff).
+
+Inspected directly this task: PhysicsTestSubsystem.h/.cpp (LogAfterfall include present line 2; 10 log uses; defect ruled OUT, no edit), Afterfall.h/.cpp (DECLARE/DEFINE_LOG_CATEGORY), Afterfall.Build.cs (module deps; PublicIncludePaths covers Afterfall.h), AfterfallEditor.Target.cs, all subsystem dir listings + key filenames, 16 Tests/ files, TASKS.json, HANDOFF.txt, build/package/launch logs (exit codes 0/0/self-exit), exe hash.
+Secondhand (prior sessions, labeled): grapple component internals, throw/carry formulas, room 9/9 + pipeline 17/17 + automation 37/37 counts, UI render checks.
+Not accessed: full conversation history; Muse private workspace beyond inbox; archived fork internals beyond dir listing (treated historical; active tree is complete without it).
+
+Findings:
+- Module compiles whole (exit 0) — every file COMPILED, including adaptive-unity-excluded PhysicsTestSubsystem.cpp (standalone compile).
+- Only working-tree source modification: PhysicsTestSubsystem.cpp +1 include line (pre-existing, preserved) and (this task) Scripts/build_editor_tmp.bat one-line path fix (backup 2026-10-24_19-15-04, hash-verified, diff one line, executed BUILD_EXIT:0).
+- Staging: user 18:53 package preserved; verified 19:06 package separate; exe launched once with -afPhysicsTest, log archived, physics PASS.
+- Cross-refs: no agent config in Source/; no game assets in Tony/; watcher root corrected to surviving path; sibling scripts audited (all resolve to authoritative except fixed P1; 2client default map is a missing-asset gap, not a wrong path).
+Provenance: statuses per master inventory vocabulary; no fabricated prompts, equations, or results.

@@ -1,0 +1,15 @@
+Every agent must read GOALS.txt, HANDOFF.txt, AGENT_PROTOCOL.txt, and latest progress entry before starting.
+Workflow: Inspect -> Reuse -> Scope -> Change -> Verify -> Record -> Handoff.
+Agents must identify task owner and scope before editing.
+Respect task locks, revisions, active ownership, concurrent agents.
+Never bypass a lock or overwrite another agent's work.
+Never commit, push, merge, or launch disruptive processes unless explicitly authorized.
+Never stop or restart the running game unless explicitly authorized.
+Separate verified facts, assumptions, failed checks, unverified checks.
+Never invent results, paths, assets, or test provenance.
+If blocked on owner action, stop at boundary and provide exact instructions.
+Use small reviewable changes; run relevant tests after authorized source changes.
+Do not make unrelated edits or silently expand task scope.
+Status labels: VERIFIED, FAILED, BLOCKED, NOT RUN, UNVERIFIED.
+HANDOFF.txt = current status. GOALS.txt = project direction. PROGRESS_LOG.txt = historical evidence.
+Work ONLY in your worktree folder. Never switch branches in Come Up Game.

@@ -1,0 +1,77 @@
+{
+  "tasks": [
+    {
+      "id": "muse-mat-001",
+      "owner": "Muse Spark",
+      "state": "complete",
+      "title": "Finish physical inventory mat implementation (radial Access/Pack Up wiring — verified 28/28 + 9/9)",
+      "files": [
+        "Source/Afterfall/Interaction/MatInteractionComponent.h",
+        "Source/Afterfall/Interaction/MatInteractionComponent.cpp"
+      ],
+      "next_action": "Claim and implement; run build/tests; update handoff."
+    },
+    {
+      "id": "kilo-box-001",
+      "owner": "Kilo",
+      "state": "authorized",
+      "title": "Spawn one small box near player start on Lvl_FirstPerson (runtime spawn, map asset untouched)",
+      "files": [
+        "Source/Afterfall/AfterfallGameMode.h",
+        "Source/Afterfall/AfterfallGameMode.cpp"
+      ],
+      "acceptance": [
+        "Exactly one APhysicalItem spawns on Lvl_FirstPerson server BeginPlay; other maps unaffected",
+        "Lvl_FirstPerson.umap byte-identical (md5 9f9988334c60c6a3c0473c685028b2f6)",
+        "Diff limited to the two GameMode files; no config/packaging/boundary changes",
+        "Build + Automation + afRoomSelfTest 9/9 green in Real Game"
+      ],
+      "next_action": "Implement per Real Game/Docs/PHYSICS-BOX-TASK.md delegation order; report diff + evidence."
+    },
+    {
+      "id": "muse-physics-001",
+      "owner": "Kilo",
+      "state": "claimed",
+      "title": "Implement physics system per master list",
+      "files": [
+        "Source/Afterfall/Physics/PhysicsTestSubsystem.h",
+        "Source/Afterfall/Physics/PhysicsTestSubsystem.cpp"
+      ],
+      "acceptance": [
+        "Gravity/free-fall displacement measured and logged",
+        "Collision response verified",
+        "Mass-dependent impulse response verified",
+        "Friction and settling verified"
+      ],
+      "next_action": "Implement physics increments; run build/tests; update handoff."
+    },
+    {
+      "id": "flint-bandage-001",
+      "owner": "Flint",
+      "state": "in-progress",
+      "title": "Bleeding + bandage self-treatment (injury loop slice 1)",
+      "files": [
+        "Source/Afterfall/Combat/InjuryStateComponent.h",
+        "Source/Afterfall/Combat/InjuryStateComponent.cpp",
+        "Source/Afterfall/Combat/MedicalCapability.h",
+        "Source/Afterfall/Combat/MedicalCapability.cpp",
+        "Source/Afterfall/Tests/MedicalTreatmentTest.cpp",
+        "Source/Afterfall/AfterfallCharacter.h",
+        "Source/Afterfall/AfterfallCharacter.cpp",
+        "Source/Afterfall/AI/ZombiePrototype.h",
+        "Source/Afterfall/AI/ZombiePrototype.cpp"
+      ],
+      "acceptance": [
+        "Zombie attack creates a bleeding wound that drains HP over time",
+        "Hold E + LMB treats the most severe actively-bleeding wound",
+        "Bandage consumed server-side per treatment",
+        "Wound record persists after bleeding stops",
+        "Normal E/LMB behavior unchanged outside treatment context",
+        "Build compiles (exit 0) with the injury/bandage slice"
+      ],
+      "next_action": "COMPILE+PACKAGE PASS (2026-10-25, post-consolidation). RUNTIME BLOCKED: packaged runs stall ~2s after slice setup at the three 'Zombie ... pursues' lines (log frozen, ~1.5 cores busy); reproduces on the pre-medical package, so not caused by FR-003. Bandage acquisition is also unwired. Equip/draw UX + HUD feedback open. See Docs/FR-003-BANDAGE-RUNTIME-REPORT.md.",
+      "ownership": "Canonical: Combat/InjuryStateComponent + MedicalCapability (BEAM pipeline, adopted and wired by Flint); duplicate Combat/BleedingComponent was removed 2026-10-25. Do not reintroduce a second bleeding ledger (double HP drain).",
+      "evidence": "AfterfallEditor exit 0; BuildCookRun BUILD SUCCESSFUL exit 0 -> Desktop/AfterfallStaging_2026-10-24_injury_pkg; Automation Afterfall.Medical 3/3 Success (_medical_tests2.log); runtime log freezes at 3x 'Zombie ... pursues' in 4 launch modes and on the pre-medical package; authority audited server-only with replicated injury state."
+    }
+  ]
+}

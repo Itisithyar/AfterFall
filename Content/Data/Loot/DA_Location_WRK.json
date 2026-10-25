@@ -1,0 +1,42 @@
+{
+  "LocationId": "WRK",
+  "DisplayName": "Roadside Wreck + Car/Truck (reference)",
+  "TableVersion": 1,
+  "Grade": { "Common": 70.0, "Uncommon": 25.0, "Rare": 4.5, "VeryRare": 0.5 },
+  "CategoryMix_WRK": {
+    "FOOD": 12, "MED": 6, "TOOL": 8, "BLD": 2, "MAT": 22, "WPN": 2,
+    "CLO": 8, "VEH": 28, "ELC": 6, "FRM": 0, "TRD": 6, "SPC": 0
+  },
+  "CategoryMix_VEH": {
+    "FOOD": 18, "MED": 10, "TOOL": 14, "BLD": 2, "MAT": 10, "WPN": 2,
+    "CLO": 12, "VEH": 20, "ELC": 6, "FRM": 0, "TRD": 6, "SPC": 0
+  },
+  "Containers": [
+    { "Type": "cp_wreck_cargo", "Count": 1, "Entries": [1, 4], "EmptyPct": 30, "Allow": ["VEH", "MAT", "FOOD", "TOOL"], "Scope": "WRK" },
+    { "Type": "cp_glovebox", "Count": 1, "Entries": [1, 1], "EmptyPct": 55, "Allow": ["TOOL", "MED", "TRD", "ELC"], "Scope": "WRK_VEH" },
+    { "Type": "cp_car_trunk", "Count": 1, "Entries": [1, 3], "EmptyPct": 30, "Allow": ["FOOD", "TOOL", "VEH", "CLO", "MED"], "Scope": "VEH" },
+    { "Type": "cp_pump", "Count": 1, "Entries": [1, 1], "EmptyPct": 20, "Allow": ["VEH"], "FuelLiters": [2, 12], "RequiresJerryOrVehicle": true, "Scope": "GAS_ONLY" }
+  ],
+  "Pools": {
+    "VEH": {
+      "Common": [{ "Item": "res_scrap_metal", "W": 60, "Qty": [1, 3] }],
+      "Uncommon": [{ "Item": "veh_tire", "W": 25, "Qty": [1, 1] }, { "Item": "res_battery", "W": 25, "Qty": [1, 1] }, { "Item": "veh_fuel_can", "W": 20, "Qty": [1, 1] }],
+      "Rare": [{ "Item": "veh_engine_part", "W": 100, "Qty": [1, 1] }],
+      "VeryRare": []
+    },
+    "MAT": {
+      "Common": [{ "Item": "res_scrap_metal", "W": 60, "Qty": [2, 5] }, { "Item": "res_cloth", "W": 25, "Qty": [1, 2] }],
+      "Uncommon": [{ "Item": "mat_rubber", "W": 40, "Qty": [1, 1] }],
+      "Rare": [],
+      "VeryRare": []
+    }
+  },
+  "Guarantees": [],
+  "Rules": {
+    "SiphonSeconds": 20,
+    "SiphonNoise": true,
+    "PumpNoRefill": true,
+    "AlarmChanceIntactCar": 0.15
+  },
+  "Notes": "Fuel pump liters forecasted at gen, siphon is timed + noisy. Engine part single-copy registry."
+}

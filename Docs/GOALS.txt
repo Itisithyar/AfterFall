@@ -1,0 +1,5 @@
+Afterfall vision: Unreal Engine-based visually editable game world.
+Long-term: reliable physics, editable test maps (floor/cubes/collision), character/animation assets, physical inventory interactions, gameplay expansion.
+Priority: (1) physics runtime verification (owner runs afPhysicsTest), (2) editable test map, (3) character/animation pipeline.
+Milestones: 9/9 room test PASS (achieved). Physics compile (achieved). Physics runtime (BLOCKED on owner).
+Separate future ideas from approved active work.

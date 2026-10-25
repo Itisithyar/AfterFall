@@ -1,0 +1,68 @@
+# UE5 gitignore (generated for AFTERFALL, UE 5.8, Windows client+server)
+# Compiled binaries
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+# Build artifacts
+Build/
+Builds/
+*.sln
+*.slnx
+*.suo
+*.user
+# VS artifacts
+.vs/
+*.VC.db
+*.opensdf
+*.sdf
+*.suo
+*.xcodeproj
+*.xcworkspace
+# Rider
+.idea/
+# OS
+.DS_Store
+Thumbs.db
+# Packaging
+*.pdb
+*.ipdb
+# Quarantined broken assets (restored after in-editor fix, never cooked/shipped).
+Content/**/*.bak
+Content/**/*.bak/*
+# Duplicate Epic-template project (source only, 134M). Canonical project is root Afterfall.uproject.
+# Template art merged to root Content/FirstPerson, Input, LevelPrototyping + Config/DefaultInput.ini.
+/AfterFall/
+# Keep project files
+!*.uproject
+!*.uplugin
+!Source/**/*.cpp
+!Source/**/*.h
+!Source/**/*.cs
+!Config/**/*.ini
+!Content/**/*.uasset
+!*.sh
+
+# Retired fork artifacts: build outputs, generated solution files and stray
+# template-project copies left after the 2026-10-24 consolidation. The canonical
+# project now lives at the repository root (RealGame.uproject).
+/Real Game/
+
+# Stray template-project copies and scratch build logs at the repo root.
+/AfterFall 5.8/
+/Afterfall 5.8/
+_*.txt
+_*.log
+
+# Generated/local-only working dirs — never committed (packages, caches,
+# backups, and the sibling animation tool project with its own .uproject).
+/AfterFallAnimation/
+/AfterfallStaging/
+/AfterfallStaging_*/
+/AfterfallSafetyBackups/
+/VaultCache/
+/.build_monitor/
+Scripts/__pycache__/
+
+# Consolidation recovery bundle (local backup artifact, not source).
+/Recovery-*.bundle
