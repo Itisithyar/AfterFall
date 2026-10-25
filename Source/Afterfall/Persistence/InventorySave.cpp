@@ -94,7 +94,7 @@ namespace
 	}
 }
 
-TArray<uint8> UInventoryPersistence::Serialize(const FInventorySave& Save)
+TArray<uint8> UInventoryPersistence::ToBytes(const FInventorySave& Save)
 {
 	TArray<uint8> Bytes;
 	FMemoryWriter Ar(Bytes);
@@ -202,7 +202,7 @@ bool UInventoryPersistence::Deserialize(const TArray<uint8>& Bytes, FInventorySa
 
 bool UInventoryPersistence::SaveToFile(const FInventorySave& Save, const FString& AbsolutePath)
 {
-	const TArray<uint8> Bytes = Serialize(Save);
+	const TArray<uint8> Bytes = ToBytes(Save);
 	return FFileHelper::SaveArrayToFile(Bytes, *AbsolutePath);
 }
 

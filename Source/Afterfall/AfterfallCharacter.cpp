@@ -1086,11 +1086,15 @@ void AAfterfallCharacter::OnCrouchPressed()
 
 void AAfterfallCharacter::OnInventoryChangedForLoad()
 {
+	// Single recompute point for the physical load state (one authoritative
+	// writer): wallet mass + held-slot mass are summed here, and
+	// CarryComponent::SyncCarryFlag calls this same path after every
+	// pickup/drop/throw/store, so neither writer can clobber the other.
 	if (!Inventory) return;
-	UAfterfallMovementComponent* Move = GetAfterfallMovement();
-	if (Move)
+	if (UAfterfallMovementComponent* Move = GetAfterfallMovement())
 	{
-		Move->SetCarriedMass(Inventory->GetWeightKg());
+		Move->SetCarriedMass(Inventory->GetWeightKg(),
+			Carry ? Carry->GetCarriedMassKg() : 0.f);
 	}
 }
 void AAfterfallCharacter::OnPausePressed()

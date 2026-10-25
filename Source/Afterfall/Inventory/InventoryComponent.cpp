@@ -423,12 +423,28 @@ void UInventoryComponent::ServerDropItem_Implementation(FGuid InstanceId, int32 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = Owner;
 	APhysicalItem* Pickup = GetWorld()->SpawnActor<APhysicalItem>(SpawnLoc, SpawnRot, SpawnParams);
-	if (Pickup)
+	if (!Pickup)
 	{
-		Pickup->ItemType = S->Item.ItemId;
-		Pickup->ServerPickupBy(nullptr); // mark as free in world (held = false)
-		// Note: APhysicalItem does not yet carry FItemInstance; ItemType links back to definition id.
+		// Destination failed -> source must stay intact. Never destroy
+		// inventory items on a failed world spawn (recoverable state beats
+		// silent deletion); the client can simply retry.
+		UE_LOG(LogAfterfall, Warning, TEXT("Drop rejected: world spawn failed (items kept)"));
+		return;
 	}
+	Pickup->ItemType = S->Item.ItemId;
+	// Hand the full instance state to the world actor: identity, count,
+	// condition and lineage cross the boundary with the item.
+	Pickup->InstancePayload = S->Item;
+	Pickup->InstancePayload.Count = Count;
+	if (Count < S->Item.Count)
+	{
+		// Partial drop = stack split: the piece entering the world becomes
+		// its own tracked instance (fresh id, provenance inherited); the
+		// remaining stack keeps the original identity in the inventory.
+		// A single identity can never live in two containers at once.
+		Pickup->InstancePayload.InstanceId = FGuid::NewGuid();
+	}
+	Pickup->ItemId = Pickup->InstancePayload.InstanceId; // one canonical id
 
 	ConsumeInstance(InstanceId, Count);
 }
@@ -544,19 +560,76 @@ void UInventoryComponent::ServerPickupItem_Implementation(APhysicalItem* Item)
 	{
 		return;
 	}
-	FName ItemId = Item->ItemType;
-	int32 Count = 1;
-	float AddedWeight = 0.f;
-	UItemDefinition* Def = LoadDefinition(ItemId);
-	AddedWeight = (Def ? Def->GetWeightKg() : WeightForItem(ItemId)) * Count;
+
+	// Restore the instance that previously left an inventory (identity,
+	// count, condition, lineage). Legacy spawns without a payload fall back
+	// to a fresh instance of ItemType with count 1.
+	FItemInstance Incoming = Item->InstancePayload;
+	if (Incoming.ItemId.IsNone())
+	{
+		Incoming.ItemId = Item->ItemType;
+	}
+	if (Incoming.Count <= 0)
+	{
+		Incoming.Count = 1;
+	}
+	if (Item->ItemId.IsValid())
+	{
+		Incoming.InstanceId = Item->ItemId; // actor's canonical id wins
+	}
+	if (Incoming.ItemId.IsNone())
+	{
+		return; // nothing identifiable to pick up
+	}
+	const FName ItemId = Incoming.ItemId;
+	const int32 Count = Incoming.Count;
+
+	const UItemDefinition* Def = LoadDefinition(ItemId);
+	const float AddedWeight = (Def ? Def->GetWeightKg() : WeightForItem(ItemId)) * Count;
 	if (!CanCarryWeight(AddedWeight))
 	{
 		UE_LOG(LogAfterfall, Warning, TEXT("Pickup rejected: overweight"));
 		return;
 	}
 
-	ServerAddItemToSlots(ItemId, Count);
-	Item->WorldState = EItemWorldState::Stored;
+	// Identity-preserving placement: the item lands as its OWN instance so
+	// guid, condition and lineage survive the transition. Only when the
+	// grid is completely full do we merge into a compatible stack — the
+	// documented merge where the surviving stack's identity wins.
+	const int32 Free = FirstFreeSlotIndex();
+	if (Free >= 0)
+	{
+		Slots[Free].Item = Incoming;
+		// Legacy wallet sync — mirrors ServerAddItemToSlots exactly so both
+		// placement paths behave identically for existing consumers.
+		if (int32* C = FindEntry(ItemId))
+		{
+			*C = FMath::Clamp(*C + Count, 0, 9999);
+		}
+		else
+		{
+			Items.Add({ ItemId, Count });
+		}
+		if (ItemId == TEXT("AF_R_Wood") || ItemId == TEXT("res_wood_log"))
+		{
+			Wood = GetCount(TEXT("AF_R_Wood")) + GetCount(TEXT("res_wood_log"));
+		}
+	}
+	else
+	{
+		// Full grid: fall back to the existing stacking path (identity
+		// merges into the surviving stack — logged, never silent).
+		UE_LOG(LogAfterfall, Warning,
+			TEXT("Pickup: grid full, merging %s into a stack (instance id not preserved)"),
+			*ItemId.ToString());
+		ServerAddItemToSlots(ItemId, Count);
+	}
+
+	// Keep the actor's canonical id in sync, then move it to the off-world
+	// Stored state (hidden, collision off) so physics/visuals match the
+	// authoritative inventory ownership instead of leaving a live ghost.
+	Item->ItemId = Incoming.InstanceId;
+	Item->ServerStore();
 	BroadcastInventoryChanged();
 }
 
@@ -592,6 +665,7 @@ void UInventoryComponent::ServerAddResource_Implementation(int32 Amount)
 	{
 		Items.Add({ TEXT("AF_R_Wood"), Amount });
 	}
+	BroadcastInventoryChanged(); // resource grant must refresh derived load
 }
 
 bool UInventoryComponent::ServerAddItem_Validate(FName ItemId, int32 Count)
@@ -619,6 +693,7 @@ void UInventoryComponent::ServerAddItem_Implementation(FName ItemId, int32 Count
 	{
 		Wood = GetCount(TEXT("AF_R_Wood")) + GetCount(TEXT("res_wood_log"));
 	}
+	BroadcastInventoryChanged(); // add must refresh derived load
 }
 
 bool UInventoryComponent::ServerTryConsume(int32 Cost)
@@ -639,6 +714,7 @@ bool UInventoryComponent::ServerTryConsume(int32 Cost)
 		}
 		*C -= Cost;
 		Wood = *C + GetCount(TEXT("res_wood_log"));
+		BroadcastInventoryChanged(); // mass changed -> recompute carried load
 		return true;
 	}
 	if (Wood < Cost)
@@ -646,6 +722,7 @@ bool UInventoryComponent::ServerTryConsume(int32 Cost)
 		return false;
 	}
 	Wood -= Cost;
+	BroadcastInventoryChanged(); // legacy wallet path: same recompute rule
 	return true;
 }
 
@@ -671,6 +748,7 @@ bool UInventoryComponent::ServerTryConsumeItem(FName ItemId, int32 Count)
 		{
 			Items.RemoveAll([&](const FInventoryEntry& E) { return E.ItemId == ItemId; });
 		}
+		BroadcastInventoryChanged(); // consume must refresh derived load
 		return true;
 	}
 	return false;

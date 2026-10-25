@@ -30,11 +30,12 @@ bool UItemCombiner::PlanConsumption(const FCraftRecipe& Recipe,
 			OutError = TEXT("supplied instance is empty");
 			return false;
 		}
-		if (!Seen.Add(P.InstanceId))
+		if (Seen.Contains(P.InstanceId))
 		{
 			OutError = FString::Printf(TEXT("instance %s supplied twice"), *P.InstanceId.ToString(EGuidFormats::Digits));
 			return false;
 		}
+		Seen.Add(P.InstanceId);
 	}
 
 	// Greedy, order-given: for each recipe input, draw from the supplied

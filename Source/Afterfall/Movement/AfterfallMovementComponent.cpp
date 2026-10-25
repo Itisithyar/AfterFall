@@ -26,15 +26,40 @@ void UAfterfallMovementComponent::SetSprinting(bool bWant)
 	}
 }
 
-void UAfterfallMovementComponent::SetCarriedMass(float MassKg)
+float UAfterfallMovementComponent::ComputeTotalMassKg(float InventoryMassKg, float HeldMassKg)
 {
-	if (MassKg < 0.f) MassKg = 0.f;
+	// Each item contributes exactly once: the wallet and the held slot are
+	// disjoint ownerships (a held item is never also inside the wallet).
+	return FMath::Max(0.f, InventoryMassKg) + FMath::Max(0.f, HeldMassKg);
+}
+
+float UAfterfallMovementComponent::ComputeLoadRatio(float TotalMassKg, float ReferenceMassKg)
+{
+	// Dimensionless lambda = Total / Reference. Invalid (<=0) reference or
+	// total -> 0: no load effect, never a division by zero or negative ratio.
+	if (TotalMassKg <= 0.f || ReferenceMassKg <= 0.f)
+	{
+		return 0.f;
+	}
+	return TotalMassKg / ReferenceMassKg;
+}
+
+bool UAfterfallMovementComponent::ComputeHeavyHaul(float HeldMassKg, float HeavyThresholdKg)
+{
+	// Heavy-haul rule (0.894 m/s cap + sprint lockout) keys off the HELD
+	// object only — the single-writer fix for the flag-clobbering defect.
+	return HeavyThresholdKg > 0.f && HeldMassKg >= HeavyThresholdKg;
+}
+
+void UAfterfallMovementComponent::SetCarriedMass(float InventoryMassKg, float HeldMassKg)
+{
+	const float Total = ComputeTotalMassKg(InventoryMassKg, HeldMassKg);
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
-		CarriedMassKg = MassKg;
+		CarriedMassKg = Total;
 	}
-	LoadRatio = (ReferenceMassKg > 0.f) ? (CarriedMassKg / ReferenceMassKg) : 0.f;
-	bCarryingHeavy = CarriedMassKg >= Tuning.HeavyMassKg;
+	LoadRatio = ComputeLoadRatio(CarriedMassKg, ReferenceMassKg);
+	bCarryingHeavy = ComputeHeavyHaul(HeldMassKg, Tuning.HeavyMassKg);
 }
 
 void UAfterfallMovementComponent::SetCarryingHeavy(bool bHeavy)

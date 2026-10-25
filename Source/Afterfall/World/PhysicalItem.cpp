@@ -120,6 +120,7 @@ void APhysicalItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(APhysicalItem, ItemId);
 	DOREPLIFETIME(APhysicalItem, ItemType);
+	DOREPLIFETIME(APhysicalItem, InstancePayload);
 	DOREPLIFETIME(APhysicalItem, WorldState);
 	DOREPLIFETIME(APhysicalItem, Holder);
 }

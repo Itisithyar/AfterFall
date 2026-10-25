@@ -1,5 +1,6 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
 #include "CarryComponent.h"
+#include "AfterfallCharacter.h"
 #include "World/PhysicalItem.h"
 #include "Movement/AfterfallMovementComponent.h"
 #include "GameFramework/Pawn.h"
@@ -132,11 +133,19 @@ UAfterfallMovementComponent* UCarryComponent::MoveComp()
 
 void UCarryComponent::SyncCarryFlag()
 {
-	// Heavy hauling caps speed via the movement model (0.894 m/s rule).
+	// Route through the character's single load-recompute point so the wallet
+	// and held-slot writers can never clobber each other's state (the old
+	// direct SetCarryingHeavy call raced SetCarriedMass). Recompute happens
+	// after CarriedItem is assigned/cleared by every pickup/drop/throw/store.
+	if (AAfterfallCharacter* C = Cast<AAfterfallCharacter>(GetOwner()))
+	{
+		C->OnInventoryChangedForLoad();
+		return;
+	}
+	// Fallback for character-less fixtures: legacy single-writer path.
 	if (UAfterfallMovementComponent* M = MoveComp())
 	{
-		const float Mass = GetCarriedMassKg();
-		M->SetCarryingHeavy(bIsCarrying && Mass >= M->Tuning.HeavyMassKg);
+		M->SetCarryingHeavy(bIsCarrying && GetCarriedMassKg() >= M->Tuning.HeavyMassKg);
 	}
 }
 

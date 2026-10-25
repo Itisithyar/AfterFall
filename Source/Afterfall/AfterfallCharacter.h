@@ -172,9 +172,12 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Afterfall|Build")
 	void ServerRequestUpgrade(AStructuralActor* Target);
 
+	// Physical-load recompute (wallet + held-slot mass -> movement state).
+	// Public: bound to Inventory::OnInventoryChanged in BeginPlay AND called
+	// by CarryComponent::SyncCarryFlag after every held-slot change.
+	void OnInventoryChangedForLoad();
 	// Pause toggle (Esc / gamepad Start). Public for the headless
 	// physics/controls fixture; still locally-controlled only.
-	void OnInventoryChangedForLoad();
 	void OnPausePressed();
 
 	// ---- Quick menu (Part A): compact top-left panel, Canvas-drawn ----

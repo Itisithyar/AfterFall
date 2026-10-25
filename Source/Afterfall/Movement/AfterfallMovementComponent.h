@@ -77,8 +77,15 @@ public:
 	float ReferenceMassKg = 15.f;
 	/** Load ratio lambda = CarriedMassKg / ReferenceMassKg. */
 	float LoadRatio = 0.f;
-	/** Server writer for carried mass. */
-	void SetCarriedMass(float MassKg);
+	/** Server writer for carried mass. Wallet + held-slot masses are summed
+	 *  (each item counted exactly once); the heavy-haul flag derives from the
+	 *  HELD item only, so wallet weight can neither trigger nor clear it. */
+	void SetCarriedMass(float InventoryMassKg, float HeldMassKg = 0.f);
+
+	// Pure load-state helpers (unit-tested, no engine state).
+	static float ComputeTotalMassKg(float InventoryMassKg, float HeldMassKg);
+	static float ComputeLoadRatio(float TotalMassKg, float ReferenceMassKg);
+	static bool ComputeHeavyHaul(float HeldMassKg, float HeavyThresholdKg);
 
 	/** Telemetry getters. */
 	float GetLoadRatio() const { return LoadRatio; }

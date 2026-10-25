@@ -56,8 +56,9 @@ public:
 	/** 'AFFS' little-endian: rejects non-save payloads up front. */
 	static constexpr uint32 SaveMagic = 0x53464641u;
 
-	/** Serialize to bytes (header + slots). Never fails. */
-	static TArray<uint8> Serialize(const FInventorySave& Save);
+	/** Serialize to bytes (header + slots). Never fails. Named ToBytes (not
+	 *  Serialize) so it never hides UObject::Serialize(FArchive&). */
+	static TArray<uint8> ToBytes(const FInventorySave& Save);
 
 	/** Parse bytes. Returns false + OutError on any incompatibility. */
 	static bool Deserialize(const TArray<uint8>& Bytes, FInventorySave& OutSave, FString& OutError);

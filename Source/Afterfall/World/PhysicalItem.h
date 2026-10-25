@@ -7,6 +7,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interaction/Interactable.h"
+#include "Inventory/ItemTypes.h"
 #include "PhysicalItem.generated.h"
 
 class UStaticMeshComponent;
@@ -38,6 +39,16 @@ public:
 
 	UPROPERTY(EditAnywhere, Replicated, Category = "Afterfall|Item")
 	FName ItemType = TEXT("AF_R_Scrap");
+
+	/**
+	 * Full instance payload (identity, count, condition, lineage) carried
+	 * across the world <-> inventory transition. An inventory drop writes its
+	 * slot instance here; a pickup restores it, so state survives the round
+	 * trip instead of degrading to a bare ItemType. Spawns without a payload
+	 * (ItemId None) fall back to ItemType with count 1.
+	 */
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Afterfall|Item")
+	FItemInstance InstancePayload;
 
 	UPROPERTY(EditAnywhere, Category = "Afterfall|Item")
 	float MassKg = 2.f;
