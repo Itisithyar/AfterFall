@@ -1,6 +1,9 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
 #include "AfterfallMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/Engine.h"
+
+static TAutoConsoleVariable<int32> CVarLoadDebug(TEXT("af.LoadDebug"), 0, TEXT("Show load telemetry"), ECVF_Default);
 
 UAfterfallMovementComponent::UAfterfallMovementComponent()
 {
@@ -184,6 +187,11 @@ void UAfterfallMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	EffectiveBraking = BrakingDecelerationWalking;
 	GroundFriction = Tuning.GroundFriction;
 	AirControl = Tuning.AirControl;
+
+	if (CVarLoadDebug.GetValueOnGameThread() != 0 && GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 0.f, FColor::Yellow, FString::Printf(TEXT("Mass=%.1f Speed=%.1f Accel=%.1f Brake=%.1f SprintMult=%.2f"), CarriedMassKg, MaxWalkSpeed, MaxAcceleration, BrakingDecelerationWalking, 1.f/(1.f+0.2f*LoadRatio)));
+	}
 
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
