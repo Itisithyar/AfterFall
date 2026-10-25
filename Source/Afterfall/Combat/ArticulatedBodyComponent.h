@@ -64,6 +64,9 @@ private:
 
 	bool bRagdoll = false;
 	bool bGrabbed = false;
+	/** Max force (N) applied through the grab handle. */
+	UPROPERTY(EditAnywhere, Category = "Afterfall|Grab")
+	float MaxGrabForce = 2000.f;
 
 	void BuildConstraints();
 	void UpdateGrabTarget();

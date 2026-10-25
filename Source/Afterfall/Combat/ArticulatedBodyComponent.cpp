@@ -5,9 +5,10 @@
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "GameFramework/Controller.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
 #include "Engine/World.h"
 #include "Afterfall.h"
+#include "Combat/HealthComponent.h"
 
 namespace
 {
@@ -154,6 +155,7 @@ bool UArticulatedBodyComponent::ServerGrab(AController* InGrabber)
 	Handle->SetLinearDamping(200.f);
 	Handle->SetAngularDamping(500.f);
 	Handle->SetInterpolationSpeed(20.f);
+	Handle->LinearStiffness = MaxGrabForce;
 	Handle->GrabComponentAtLocationWithRotation(Torso, NAME_None, TorsoLoc, Torso->GetComponentRotation());
 	if (!Handle->GrabbedComponent)
 	{
@@ -221,6 +223,16 @@ void UArticulatedBodyComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (bGrabbed)
 	{
+		if (AActor* OwnerActor = GetOwner())
+		{
+			if (ACharacter* C = Cast<ACharacter>(OwnerActor))
+			{
+				if (UHealthComponent* HC = C->FindComponentByClass<UHealthComponent>())
+				{
+					if (HC->bIsDead) { ReleaseHandle(); return; }
+				}
+			}
+		}
 		UpdateGrabTarget();
 	}
 }
