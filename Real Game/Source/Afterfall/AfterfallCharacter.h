@@ -399,6 +399,8 @@ private:
 	bool bGrabHoldFired = false;    // the 230 ms RMB hold has committed
 	FTimerHandle ClickResolveTimer;
 	FTimerHandle GrabHoldTimer;
+    /** Short pose recovery after a resolved click interaction/attack. */
+    FTimerHandle RightArmRecoveryTimer;
 	/** Pivot any weapon/tool mesh attaches to; double-click rotates it. */
 	UPROPERTY(VisibleAnywhere, Category = "Afterfall|Input")
 	USceneComponent* WeaponHandPivot = nullptr;

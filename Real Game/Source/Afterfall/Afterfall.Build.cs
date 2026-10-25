@@ -31,6 +31,8 @@ public class Afterfall : ModuleRules
 			// Engine ships this module (Plugin: ProceduralMeshComponent,
 			// EnabledByDefault=true); nothing else in the project uses it.
 			"ProceduralMeshComponent",
+			// UE native Procedural Content Generation runtime module.
+			"PCG",
 			"UMG",
 			"Slate",
 			"SlateCore"

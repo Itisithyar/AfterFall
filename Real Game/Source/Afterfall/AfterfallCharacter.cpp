@@ -1004,6 +1004,10 @@ void AAfterfallCharacter::ResolveSingleClick()
 	}
 	bPendingClick = false;
 	LMBReleaseSec = 0.0;
+	// Drive the adaptive-limb solver for a resolved click; radial holds bypass this path.
+	SetReachTargetFromCamera();
+	GetWorldTimerManager().ClearTimer(RightArmRecoveryTimer);
+	GetWorldTimerManager().SetTimer(RightArmRecoveryTimer, this, &AAfterfallCharacter::OnReachReleased, 0.22f, false);
 	// A normal Mouse-1 click performs the focused interaction (including item
 	// pickup). If there is no interactable target, preserve the melee fallback.
 	if (bEKeyHeld)

@@ -1,4 +1,5 @@
 #include "ProceduralTerrain.h"
+#include "PCGComponent.h"
 #include "Afterfall.h"
 #include "Net/UnrealNetwork.h"
 
@@ -11,6 +12,9 @@ AProceduralTerrain::AProceduralTerrain()
 	TerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	TerrainMesh->SetupAttachment(SceneRoot);
 	TerrainMesh->SetCollisionProfileName(TEXT("BlockAll"));
+    PlacementPCG = CreateDefaultSubobject<UPCGComponent>(TEXT("TerrainPlacementPCG"));
+    PlacementPCG->InputType = EPCGComponentInput::Actor;
+    PlacementPCG->GenerationTrigger = EPCGComponentGenerationTrigger::GenerateOnDemand;
 	TerrainMesh->bUseAsyncCooking = true;
 }
 
@@ -126,6 +130,12 @@ void AProceduralTerrain::RebuildTerrain()
 	}
 	TerrainMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	TerrainMesh->SetGenerateOverlapEvents(false);
+	// Generate placement only after the procedural surface exists.
+	if (PlacementPCG && PlacementGraph)
+	{
+		PlacementPCG->SetGraphLocal(PlacementGraph);
+		PlacementPCG->GenerateLocal(true);
+	}
 	UE_LOG(LogAfterfall, Log, TEXT("Generated terrain grid %dx%d, %.0fm x %.0fm, seed=%d"),
 		NX, NY, TotalX / 100.f, TotalY / 100.f, RandomSeed);
 }

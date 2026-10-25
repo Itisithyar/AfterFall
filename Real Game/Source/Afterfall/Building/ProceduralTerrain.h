@@ -4,6 +4,8 @@
 #include "Components/SceneComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Math/AfterfallMath.h"
+class UPCGComponent;
+class UPCGGraphInterface;
 #include "ProceduralTerrain.generated.h"
 
 UCLASS()
@@ -14,6 +16,9 @@ public:
 	AProceduralTerrain();
 	UPROPERTY(VisibleAnywhere, Category="Terrain") TObjectPtr<USceneComponent> SceneRoot;
 	UPROPERTY(VisibleAnywhere, Category="Terrain") TObjectPtr<UProceduralMeshComponent> TerrainMesh;
+    /** Optional UE PCG graph for Surface Sampler -> Static Mesh Spawner placement. */
+    UPROPERTY(EditAnywhere, Category="Terrain|PCG") TObjectPtr<UPCGGraphInterface> PlacementGraph = nullptr;
+    UPROPERTY(VisibleAnywhere, Category="Terrain|PCG") TObjectPtr<UPCGComponent> PlacementPCG = nullptr;
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_TerrainConfig, Category="Terrain") int32 TileCountX = 10;
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_TerrainConfig, Category="Terrain") int32 TileCountY = 10;
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_TerrainConfig, Category="Terrain") float TileSize = 300.f;
