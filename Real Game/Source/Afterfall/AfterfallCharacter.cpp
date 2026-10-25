@@ -6,6 +6,7 @@
 #include "Animation/AdaptiveLimbComponent.h"
 #include "Structural/ConstructionValidator.h"
 #include "Destruction/DestructionPropagation.h"
+#include "Procedural/ProceduralObjectActor.h"
 #include "Inventory/InventoryComponent.h"
 #include "Combat/HealthComponent.h"
 #include "Combat/InjuryStateComponent.h"
@@ -43,6 +44,59 @@
 #include "InputActionValue.h"
 #include "InputModifiers.h"
 #include "UI/AfterfallHUD.h"
+
+namespace
+{
+	/**
+	 * Route an authoritative weapon hit into the universal procedural-object
+	 * pipeline. The dent is committed before the fracture event so rebuilds
+	 * replay deformation first and carve the already-deformed field second.
+	 * The energy-to-depth coefficient is a conservative gameplay tuning value,
+	 * not a claim of calibrated material plasticity.
+	 */
+	bool ApplyProceduralObjectImpact(AProceduralObjectActor* Object, const FVector& WorldPoint,
+		const FVector& WorldOutwardNormal, const FVector& WorldImpactDirection, float EnergyJ)
+	{
+		if (!Object || !Object->HasAuthority() || !FMath::IsFinite(EnergyJ) || EnergyJ <= 0.f)
+		{
+			return false;
+		}
+
+		const FTransform Transform = Object->GetActorTransform();
+		const FVector LocalPoint = Transform.InverseTransformPosition(WorldPoint);
+		FVector Outward = WorldOutwardNormal.GetSafeNormal();
+		if (Outward.IsNearlyZero())
+		{
+			Outward = -WorldImpactDirection.GetSafeNormal();
+		}
+		const FVector LocalOutward = Transform.InverseTransformVectorNoScale(Outward).GetSafeNormal();
+		const FVector LocalImpactDirection = Transform.InverseTransformVectorNoScale(
+			WorldImpactDirection.GetSafeNormal()).GetSafeNormal();
+		if (LocalOutward.IsNearlyZero() || LocalImpactDirection.IsNearlyZero())
+		{
+			return false;
+		}
+
+		FProceduralDeformOp Deform;
+		Deform.OpId = FGuid::NewGuid();
+		Deform.Center = LocalPoint;
+		Deform.Direction = LocalOutward;
+		Deform.Radius = FMath::Clamp(Object->Desc.CellSize * 4.f, 24.f, 96.f);
+		Deform.Strength = FMath::Clamp(5.f * FMath::Sqrt(EnergyJ / 100.f), 0.5f, 12.f);
+		const bool bDeformed = Object->ServerApplyDeform(Deform);
+
+		const uint32 FractureSeed = static_cast<uint32>(Object->Desc.Seed)
+			^ static_cast<uint32>(Object->ServerSeq + 1);
+		const bool bFractured = Object->ServerApplyFracture(LocalPoint, LocalImpactDirection,
+			EnergyJ, Object->Desc.MaterialProfile, FractureSeed, FGuid::NewGuid());
+		if (bDeformed || bFractured)
+		{
+			UE_LOG(LogAfterfall, Log, TEXT("Procedural impact %s E=%.1fJ deform=%d fracture=%d"),
+				*Object->GetName(), EnergyJ, bDeformed ? 1 : 0, bFractured ? 1 : 0);
+		}
+		return bDeformed || bFractured;
+	}
+}
 #include "UI/InventoryMatWidget.h"
 #include "Voxel/VoxelChunkActor.h"
 #include "Voxel/VoxelChunkTypes.h"
@@ -553,6 +607,14 @@ void AAfterfallCharacter::ServerFireHitscan_Implementation(const FVector& Direct
 			UDestructionPropagationService::BulletDamagePerCell(), FGuid::NewGuid()) > 0)
 		{
 			ConfirmedHits++;
+		}
+	}
+	if (AProceduralObjectActor* Object = Cast<AProceduralObjectActor>(Hit.GetActor()))
+	{
+		if (ApplyProceduralObjectImpact(Object, Hit.ImpactPoint, Hit.ImpactNormal, Dir,
+			UDestructionPropagationService::BulletEnergy()))
+		{
+			++ConfirmedHits;
 		}
 	}
 }
@@ -1980,6 +2042,14 @@ void AAfterfallCharacter::ServerAttack_Implementation()
 			UDestructionPropagationService::AttackDamagePerCell(), FGuid::NewGuid()) > 0)
 		{
 			ConfirmedHits++;
+		}
+	}
+	else if (AProceduralObjectActor* Object = Cast<AProceduralObjectActor>(Hit.GetActor()))
+	{
+		if (ApplyProceduralObjectImpact(Object, Hit.ImpactPoint, Hit.ImpactNormal,
+			CamRot.Vector(), UDestructionPropagationService::AttackEnergy()))
+		{
+			++ConfirmedHits;
 		}
 	}
 	AmmoConsumed++;
