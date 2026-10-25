@@ -1,6 +1,9 @@
 // Copyright (c) 2026 AFTERFALL. All rights reserved.
 // Owner: FLINT (GLM session) — see BoxWallStructure.h.
 #include "BoxWallStructure.h"
+#include "Engine/Engine.h"
+
+static TAutoConsoleVariable<int32> CVarAfterfallDebugImpact(TEXT("Afterfall.DebugImpact"), 1, TEXT("Debug impact overlay"));
 #include "Components/StaticMeshComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
@@ -293,8 +296,20 @@ void ABoxWallStructure::OnBlockHit(UPrimitiveComponent* /*HitComp*/,
 		GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0))
 	{
 		UE_LOG(LogTemp, Log, TEXT("[IMPACT-DEDUP] SKIPPED other=%s"), *OtherActor->GetName());
+#if !UE_BUILD_SHIPPING
+		if (GEngine && CVarAfterfallDebugImpact.GetValueOnGameThread())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, FString::Printf(TEXT("[IMPACT] SKIPPED (dup) other=%s"), *OtherActor->GetName()));
+		}
+#endif
 		return;
 	}
+#if !UE_BUILD_SHIPPING
+	if (GEngine && CVarAfterfallDebugImpact.GetValueOnGameThread())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green, FString::Printf(TEXT("[IMPACT] APPLIED other=%s energy=0"), *OtherActor->GetName()));
+	}
+#endif
 	float MassKg = 75.f; // shared BodyRegion default body mass profile
 	FVector VelOther = FVector::ZeroVector;
 	if (UPrimitiveComponent* Prim = OtherComp)
