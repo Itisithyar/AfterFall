@@ -26,14 +26,7 @@ protected:
 	bool bSpawnTestTerrain = false;
 
 private:
-	/**
-	 * kilo-box-001 (authorized 2026-10-24): exactly ONE small, light,
-	 * pickable box near the player start — and only on Lvl_FirstPerson.
-	 * Purely runtime: the map asset, config and every other map are
-	 * untouched. Guarded so a server session can never spawn a second one.
-	 */
-	void SpawnAuthorizedTestBox();
-	void DeferredLightCheck();
-
-	bool bSpawnedTestBox = false;
+	void SpawnPlayableFloor();
+	void SpawnProceduralShowcase();
+	void ConfigureMorningLighting();
 };
