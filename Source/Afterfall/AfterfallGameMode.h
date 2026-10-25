@@ -13,6 +13,7 @@ class AFTERFALL_API AAfterfallGameMode : public AGameMode
 
 public:
 	AAfterfallGameMode();
+	virtual void BeginPlay() override;
 
 	// Server-only: canonical seed for deterministic region generation.
 	// Replicated to clients via GameState in later milestone (Phase 4).

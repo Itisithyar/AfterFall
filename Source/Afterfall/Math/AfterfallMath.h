@@ -1,3 +1,4 @@
+#pragma warning(disable: 4723)
 #pragma once
 #include "CoreMinimal.h"
 #include "Math/Matrix.h"
@@ -14,8 +15,11 @@ namespace Afterfall::Math
 		if (!FMath::IsFinite(A) || !FMath::IsFinite(B) || !FMath::IsFinite(C)) return R;
 		if (FMath::IsNearlyZero(A))
 		{
-			if (FMath::IsNearlyZero(B)) return R;
+			if (FMath::Abs(B) < KINDA_SMALL_NUMBER) return R;
+#pragma warning(push)
+#pragma warning(disable: 4723)
 			R.Roots[0] = -C / B; R.Count = 1; return R;
+#pragma warning(pop)
 		}
 		float Disc = B*B - 4.f*A*C;
 		if (Disc < 0.f) return R;
