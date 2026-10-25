@@ -58,6 +58,7 @@ AAfterfallCharacter::AAfterfallCharacter(const FObjectInitializer& ObjectInitial
 		ACharacter::CharacterMovementComponentName))
 {
 	bReplicates = true;
+	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 	AfterfallInventory = CreateDefaultSubobject<UAfterfallInventoryComponent>(TEXT("AfterfallInventory"));
 	Health = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
