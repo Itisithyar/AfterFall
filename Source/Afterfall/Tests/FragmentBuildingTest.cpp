@@ -19,15 +19,15 @@ bool FFragmentBlastDirectionTest::RunTest(const FString& P)
 	const FVector Sec(1000.f, 0.f, 0.f);
 	const FVector Imp = AProceduralBuilding::FragmentImpulseFor(Sec, Epi, 1000.f, 1600.f, 0.f, Stream);
 	TestTrue(TEXT("points along +X"), FVector::DotProduct(Imp, FVector::ForwardVector) > 0.f);
-	TestEqual(TEXT("radial axis only"), Imp.Y, 0.0f, 1e-4f);
-	TestEqual(TEXT("no vertical kick"), Imp.Z, 0.0f, 1e-4f);
+	TestNearlyEqual(TEXT("radial axis only"), Imp.Y, 0.0, 1e-4);
+	TestNearlyEqual(TEXT("no vertical kick"), Imp.Z, 0.0, 1e-4);
 	// Falloff: 1 - 1000/1600 = 0.375 of strength.
-	TestEqual(TEXT("falloff-scaled magnitude"), Imp.X, 375.0f, 1e-4f);
+	TestNearlyEqual(TEXT("falloff-scaled magnitude"), Imp.X, 375.0, 1e-4);
 
 	// Strength scales linearly.
 	FRandomStream Stream2(1);
 	const FVector Imp2 = AProceduralBuilding::FragmentImpulseFor(Sec, Epi, 2000.f, 1600.f, 0.f, Stream2);
-	TestEqual(TEXT("2x strength = 2x impulse"), Imp2.X, 750.0f, 1e-4f);
+	TestNearlyEqual(TEXT("2x strength = 2x impulse"), Imp2.X, 750.0, 1e-4);
 	return true;
 }
 
@@ -44,7 +44,7 @@ bool FFragmentBlastFalloffTest::RunTest(const FString& P)
 	// Exactly at the epicenter: straight up, full strength (up instead of a
 	// zero-length direction that would leave the piece in place).
 	const FVector Here = AProceduralBuilding::FragmentImpulseFor(Epi, Epi, 1000.f, 1600.f, 0.f, Stream);
-	TestEqual(TEXT("degenerate blasts up"), Here.Z, 1000.0f, 1e-4f);
+	TestNearlyEqual(TEXT("degenerate blasts up"), Here.Z, 1000.0, 1e-4);
 	TestTrue(TEXT("degenerate is pure vertical"), FVector::DotProduct(Here, FVector::UpVector) > 0.f);
 	return true;
 }
