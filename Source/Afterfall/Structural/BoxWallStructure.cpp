@@ -289,6 +289,12 @@ void ABoxWallStructure::OnBlockHit(UPrimitiveComponent* /*HitComp*/,
 	{
 		return;
 	}
+	if (!ImpactDedup.TryCommit(OtherActor->GetUniqueID(), GetUniqueID(),
+		GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0))
+	{
+		UE_LOG(LogTemp, Log, TEXT("[IMPACT-DEDUP] SKIPPED other=%s"), *OtherActor->GetName());
+		return;
+	}
 	float MassKg = 75.f; // shared BodyRegion default body mass profile
 	FVector VelOther = FVector::ZeroVector;
 	if (UPrimitiveComponent* Prim = OtherComp)

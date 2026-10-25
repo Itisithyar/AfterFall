@@ -11,6 +11,7 @@
 #include "GameFramework/Actor.h"
 #include "Engine/StaticMeshActor.h"
 #include "Structural/BoxBuilding.h"
+#include "Impact/ImpactDedup.h"
 #include "BoxWallStructure.generated.h"
 
 class UStaticMeshComponent;
@@ -112,6 +113,7 @@ private:
 	TMap<int32, UStaticMeshComponent*> BlockComps;
 	UPROPERTY()
 	TArray<FGuid> RecentEventIds; ///< cap 8 like StructuralActor
+	Afterfall::FImpactDedup ImpactDedup; ///< wall-level collision dedup
 	UPROPERTY()
 	TMap<int64, float> RecentImpactKeys; ///< key -> expiry (seconds); wall-level dedup
 	bool bInitialized = false;
