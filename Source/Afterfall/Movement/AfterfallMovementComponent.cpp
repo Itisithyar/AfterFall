@@ -46,8 +46,6 @@ float UAfterfallMovementComponent::ComputeLoadRatio(float TotalMassKg, float Ref
 
 bool UAfterfallMovementComponent::ComputeHeavyHaul(float HeldMassKg, float HeavyThresholdKg)
 {
-	// Heavy-haul rule (0.894 m/s cap + sprint lockout) keys off the HELD
-	// object only — the single-writer fix for the flag-clobbering defect.
 	return HeavyThresholdKg > 0.f && HeldMassKg >= HeavyThresholdKg;
 }
 
@@ -161,11 +159,8 @@ void UAfterfallMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 	// Load ratio.
 	LoadRatio = (ReferenceMassKg > 0.f) ? (CarriedMassKg / ReferenceMassKg) : 0.f;
-	const float ClampLoad = FMath::Clamp(LoadRatio, 0.f, 4.f);
-	// Bounded game-design response functions (provisional).
-	const float AccelFactor = FMath::Clamp(1.f - 0.15f * ClampLoad, 0.3f, 1.f);
-	const float SpeedFactor = FMath::Clamp(1.f - 0.08f * ClampLoad, 0.5f, 1.f);
-	const float BrakeFactor = FMath::Clamp(1.f - 0.1f * ClampLoad, 0.4f, 1.f);
+	float AccelFactor, SpeedFactor, BrakeFactor;
+	ComputeMovementFactors(LoadRatio, AccelFactor, SpeedFactor, BrakeFactor);
 
 	const bool bSprinting = SprintState == EAfterfallSprintState::Sprinting;
 	const float BaseAccel = bSprinting ? Tuning.SprintAcceleration : Tuning.NormalAcceleration;
@@ -203,6 +198,14 @@ float UAfterfallMovementComponent::GetMaxSpeed() const
 		return Tuning.SprintMaxSpeed;
 	}
 	return Tuning.NormalMaxSpeed;
+}
+
+void UAfterfallMovementComponent::ComputeMovementFactors(float LoadRatio, float& OutAccelFactor, float& OutSpeedFactor, float& OutBrakeFactor)
+{
+	const float L = FMath::Clamp(LoadRatio, 0.f, 4.f);
+	OutAccelFactor = FMath::Clamp(1.f - 0.15f * L, 0.3f, 1.f);
+	OutSpeedFactor = FMath::Clamp(1.f - 0.08f * L, 0.5f, 1.f);
+	OutBrakeFactor = FMath::Clamp(1.f - 0.1f * L, 0.4f, 1.f);
 }
 
 void UAfterfallMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -86,6 +86,7 @@ public:
 	static float ComputeTotalMassKg(float InventoryMassKg, float HeldMassKg);
 	static float ComputeLoadRatio(float TotalMassKg, float ReferenceMassKg);
 	static bool ComputeHeavyHaul(float HeldMassKg, float HeavyThresholdKg);
+	static void ComputeMovementFactors(float LoadRatio, float& OutAccelFactor, float& OutSpeedFactor, float& OutBrakeFactor);
 
 	/** Telemetry getters. */
 	float GetLoadRatio() const { return LoadRatio; }
