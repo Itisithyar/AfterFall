@@ -64,13 +64,13 @@ struct FHouseBlueprint
 {
 	GENERATED_BODY()
 
-	UPROPERTY() FName ArchetypeName;  // "house", "shop", "warehouse"
-	UPROPERTY() float FootprintM;      // overall width/depth in meters (square)
-	UPROPERTY() int32 RoomCount;       // number of rooms
+	UPROPERTY() FName ArchetypeName = NAME_None;  // "house", "shop", "warehouse"
+	UPROPERTY() float FootprintM = 0.f;      // overall width/depth in meters (square)
+	UPROPERTY() int32 RoomCount = 0;       // number of rooms
 	UPROPERTY() TArray<FVector> RoomCentersM;   // local room centers
 	UPROPERTY() TArray<FVector> DoorPositionsM; // local door positions (on perimeter)
 	UPROPERTY() TArray<FVector> FurniturePositionsM; // local furniture spots
-	UPROPERTY() EMaterialType PrimaryMaterial;  // wood/stone/etc
+	UPROPERTY() EMaterialType PrimaryMaterial = EMaterialType::Wood;  // wood/stone/etc
 };
 
 /** Chunk-aligned house site: one house per chunk anchor, 5-block gap rule. */
@@ -79,8 +79,8 @@ struct FHousePlacement
 {
 	GENERATED_BODY()
 
-	UPROPERTY() FGuid StableId;
-	UPROPERTY() FIntPoint ChunkCoord;  // chunk this house is anchored to
+	UPROPERTY() FGuid StableId = FGuid();
+	UPROPERTY() FIntPoint ChunkCoord = FIntPoint::ZeroValue;  // chunk this house is anchored to
 	UPROPERTY() FVector LocationM = FVector::ZeroVector;  // world location in meters
 	UPROPERTY() FHouseBlueprint Blueprint;
 	/** All chunks the house footprint touches (for multi-chunk buildings). */
@@ -104,7 +104,7 @@ struct FAfterfallBuildingSite
 {
 	GENERATED_BODY()
 
-	UPROPERTY() FGuid StableId;
+	UPROPERTY() FGuid StableId = FGuid();
 	UPROPERTY() FVector LocationM = FVector::ZeroVector;
 	UPROPERTY() int32 Archetype = 0; // 0 house, 1 shop, 2 warehouse
 	UPROPERTY() float FootprintM = 12.f;
