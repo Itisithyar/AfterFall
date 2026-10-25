@@ -11,10 +11,11 @@ class AFTERFALL_API AProceduralTerrain : public AActor
 	GENERATED_BODY()
 public:
 	AProceduralTerrain();
-	UPROPERTY(EditAnywhere, Category="Terrain") int32 TileCountX = 8;
-	UPROPERTY(EditAnywhere, Category="Terrain") int32 TileCountY = 8;
-	UPROPERTY(EditAnywhere, Category="Terrain") float TileSize = 800.f;
-	UPROPERTY(EditAnywhere, Category="Terrain") float HeightScale = 200.f;
+	UPROPERTY(EditAnywhere, Category="Terrain") int32 TileCountX = 10;
+	UPROPERTY(EditAnywhere, Category="Terrain") int32 TileCountY = 10;
+	UPROPERTY(EditAnywhere, Category="Terrain") float TileSize = 300.f;
+	UPROPERTY(EditAnywhere, Category="Terrain") float HeightScale = 320.f;
+	UPROPERTY(EditAnywhere, Category="Terrain") float RhombusShear = 0.0f;
 	UPROPERTY(EditAnywhere, Category="Terrain") int32 RandomSeed = 12345;
 	UPROPERTY(EditAnywhere, Category="Terrain") bool bFlatMode = false;
 	UPROPERTY(EditAnywhere, Category="Terrain") UMaterialInterface* TerrainMaterial = nullptr;

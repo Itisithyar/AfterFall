@@ -12,7 +12,7 @@ class AFTERFALL_API AProceduralBuilding : public AActor
 public:
 	AProceduralBuilding();
 	UPROPERTY(EditAnywhere, Category="Building") int32 FloorCount = 3;
-	UPROPERTY(EditAnywhere, Category="Building") FVector2D FootprintSize = FVector2D(800,800);
+	UPROPERTY(EditAnywhere, Category="Building") FVector2D FootprintSize = FVector2D(900,900);
 	UPROPERTY(EditAnywhere, Category="Building") float WallThickness = 20.f;
 	UPROPERTY(EditAnywhere, Category="Building") float FloorHeight = 300.f;
 	UPROPERTY(EditAnywhere, Category="Building") int32 RandomSeed = 12345;
