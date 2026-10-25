@@ -264,16 +264,18 @@ void AAfterfallGameMode::ConfigureMorningLighting()
 	}
 	if (!Sun)
 	{
-		Sun = W->SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator(-22.f, 55.f, 0.f));
+		// Spawn at its default rotation. Passing the desired rotation here can
+		// move the component before its Static mobility is changed below.
+		Sun = W->SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator::ZeroRotator);
 	}
 	if (Sun)
 	{
-		Sun->SetActorRotation(FRotator(-22.f, 55.f, 0.f)); // low morning sun, directed down onto the level
-		Sun->SetMobility(EComponentMobility::Movable);
-		Sun->SetReplicates(true);
-		Sun->Tags.AddUnique(FName("AfterfallMorningSun"));
 		if (UDirectionalLightComponent* Light = Sun->GetComponentByClass<UDirectionalLightComponent>())
 		{
+			// Change the actual light component before moving its owning actor.
+			// AActor mobility alone does not clear the component warning.
+			Light->SetMobility(EComponentMobility::Movable);
+			Sun->SetMobility(EComponentMobility::Movable);
 			// Keep intensity close to the template's modest nonphysical range;
 			// physical full-sun lux values overexpose this uncalibrated graybox.
 			Light->SetIntensity(3.2f);
@@ -281,6 +283,9 @@ void AAfterfallGameMode::ConfigureMorningLighting()
 			Light->bUseTemperature = true;
 			Light->Temperature = 5200.f;
 		}
+		Sun->SetReplicates(true);
+		Sun->Tags.AddUnique(FName("AfterfallMorningSun"));
+		Sun->SetActorRotation(FRotator(-22.f, 55.f, 0.f)); // morning sun directed down onto the level
 	}
 	ASkyLight* Sky = nullptr;
 	for (TActorIterator<ASkyLight> It(W); It; ++It)
